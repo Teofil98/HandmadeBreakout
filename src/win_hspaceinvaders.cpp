@@ -58,10 +58,9 @@ int CALLBACK WinMain(
         return -1; //TODO: Find actual code I want to return. 
     }
 
-    while(1) {      
+    while(1) {
         MSG message;
-        if(GetMessageA(&message, window, 0, 0) == false) {
-            PostQuitMessage(0);
+        if(GetMessageA(&message, window, 0, 0) <= 0) {
             break;
         }
         TranslateMessage(&message);

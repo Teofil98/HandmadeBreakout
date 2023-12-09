@@ -1,53 +1,62 @@
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers" 
+#pragma GCC diagnostic warning "-Wunused-function"
+#pragma GCC diagnostic warning "-Wunused-variable"
 
 #include <windows.h>
 #include "include/hspaceinvaders.h"
 #include <stdio.h> //TODO: Delete after testing done
+#include <stdint.h>
 
 static bool g_running;
 static BITMAPINFO g_bm_info;
 static void* g_bitmap;
-static HBITMAP g_bitmap_handle;
-static HDC g_device_context;
+static int g_bitmap_width;
+static int g_bitmap_height;
 
 static void win32_resize_DIB_section(const int width, const int height)
 {
-    // check if bitmap already initialized
-    if(g_bitmap_handle != NULL) {
-        DeleteObject(g_bitmap_handle);
+    if(g_bitmap != NULL) {
+        VirtualFree(g_bitmap, 0, MEM_RELEASE);
+        g_bitmap = NULL;
     }
-
-    if(g_device_context != 0) {
-        // DC compatible with the screen (why, windows?)
-        g_device_context = CreateCompatibleDC(0);
-    }
-
+    g_bitmap_width = width;
+    g_bitmap_height = height;
     g_bm_info = {
         .bmiHeader = {
             .biSize = sizeof(BITMAPINFOHEADER),
             .biWidth = width,
-            .biHeight = height,
+            // Negative height to create a top-down DIB
+            .biHeight = -height,
             .biPlanes = 1,
             .biBitCount = 32,
             .biCompression = BI_RGB
         }
     };
-    g_bitmap_handle = CreateDIBSection(
-            g_device_context,
-            &g_bm_info,
-            DIB_RGB_COLORS,
-            &g_bitmap,
-            NULL,
-            0            
-    );
+    g_bitmap = VirtualAlloc(
+                    NULL, width * height * 4, 
+                    MEM_COMMIT, PAGE_READWRITE
+                ); 
 }
 
-static void win32_update_window(const int x, const int y, const int width, const int height)
+static void draw_gradient()
 {
+    uint32_t* pixels = (uint32_t*)g_bitmap;
+    const int nb_rows = g_bitmap_height;
+    const int nb_cols = g_bitmap_width;
+    for(int row = 0; row < nb_rows; row ++) {
+        for(int col = 0; col < nb_cols; col ++) {
+            pixels[row * nb_cols + col] = 0x00FF0000; // TODO: Add RGBA macros 
+        }
+    }
+}
+
+static void win32_update_window(HDC device_context, const int x, const int y, const int width, const int height)
+{
+    // TODO: Check if src and dest are correct
     StretchDIBits(
-        g_device_context,
+        device_context,
         x, y, width, height,
-        x, y, width, height,
+        x, y, g_bitmap_width, g_bitmap_height,
         g_bitmap, &g_bm_info,
         DIB_RGB_COLORS,
         SRCCOPY
@@ -82,12 +91,20 @@ LRESULT win32_window_callback(
     } break;
     case WM_PAINT: {
         PAINTSTRUCT paint;
-        BeginPaint(window, &paint);
+        HDC device_context = BeginPaint(window, &paint);
         int x = paint.rcPaint.left;
         int y = paint.rcPaint.top;
         int width = paint.rcPaint.right - paint.rcPaint.left;
         int height = paint.rcPaint.bottom - paint.rcPaint.top;
-        win32_update_window(x, y, width, height);
+        draw_gradient();
+        // FIXME: Check how we can redraw using the PAINTSTRUCT
+        // instead of the whole screen
+        //win32_update_window(device_context, x, y, width, height);
+        RECT client_rect;
+        GetClientRect(window, &client_rect);
+        width = client_rect.right - client_rect.left;
+        height = client_rect.bottom - client_rect.top;
+        win32_update_window(device_context, 0, 0, width, height);
         EndPaint(window, &paint);
     } break;
     default: {

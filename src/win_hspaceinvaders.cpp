@@ -1,10 +1,11 @@
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers" 
 #pragma GCC diagnostic warning "-Wunused-function"
 #pragma GCC diagnostic warning "-Wunused-variable"
+#pragma GCC diagnostic warning "-Wunused-but-set-variable"
 
 #include <windows.h>
 #include "include/hspaceinvaders.h"
-#include <stdio.h> //TODO: Delete after testing done
+#include <stdio.h> // TODO: Delete after testing done
 #include <stdint.h>
 
 #define RGBA_ALPHA(x) ((uint8_t)x << 24)
@@ -13,21 +14,44 @@
 #define RGBA_BLUE(x) ((uint8_t)x << 0)
 #define RGBA(r, g, b, a) (RGBA_RED(r) | RGBA_GREEN(g) | RGBA_BLUE(b) | RGBA_ALPHA(a))
 
-static bool g_running;
-static BITMAPINFO g_bm_info;
-static void* g_bitmap;
-static int g_bitmap_width;
-static int g_bitmap_height;
+struct win32_backbuffer {
+    BITMAPINFO bm_info;
+    int bytes_per_pixel;
+    void* bitmap;
+    int width;
+    int height;
+};
 
-static void win32_resize_DIB_section(const int width, const int height)
+struct win32_window_size {
+    int width;
+    int height;
+};
+
+// TODO: Global variables for now, see later if I want to change them
+static bool g_running;
+static win32_backbuffer g_backbuffer;
+
+static win32_window_size win32_get_window_size(const HWND window)
 {
-    if(g_bitmap != NULL) {
-        VirtualFree(g_bitmap, 0, MEM_RELEASE);
-        g_bitmap = NULL;
+    win32_window_size size;
+    RECT client_rect;
+    GetClientRect(window, &client_rect);
+    size.width = client_rect.right - client_rect.left;
+    size.height = client_rect.bottom - client_rect.top;
+    return size;
+}
+
+static void win32_resize_DIB_section(win32_backbuffer& backbuffer, 
+                    const int width, const int height)
+{
+    if(backbuffer.bitmap != NULL) {
+        VirtualFree(backbuffer.bitmap, 0, MEM_RELEASE);
+        backbuffer.bitmap = NULL;
     }
-    g_bitmap_width = width;
-    g_bitmap_height = height;
-    g_bm_info = {
+    backbuffer.width = width;
+    backbuffer.height = height;
+    backbuffer.bytes_per_pixel = 4;
+    backbuffer.bm_info = {
         .bmiHeader = {
             .biSize = sizeof(BITMAPINFOHEADER),
             .biWidth = width,
@@ -38,36 +62,39 @@ static void win32_resize_DIB_section(const int width, const int height)
             .biCompression = BI_RGB
         }
     };
-    g_bitmap = VirtualAlloc(
-                    NULL, width * height * 4, 
+    backbuffer.bitmap = VirtualAlloc(
+                    NULL, width * height * backbuffer.bytes_per_pixel, 
                     MEM_COMMIT, PAGE_READWRITE
                 ); 
-    //TODO: Maybe clear this to black
+    // TODO: Maybe clear this to black
 }
 
-static void draw_gradient(int row_offset, int col_offset)
+static void draw_gradient(const win32_backbuffer& backbuffer, 
+                const int row_offset, const int col_offset)
 {
-    uint32_t* pixels = (uint32_t*)g_bitmap;
-    const int nb_rows = g_bitmap_height;
-    const int nb_cols = g_bitmap_width;
+    uint32_t* pixels = (uint32_t*)backbuffer.bitmap;
+    const int nb_rows = backbuffer.height;
+    const int nb_cols = backbuffer.width;
     for(int row = 0; row < nb_rows; row ++) {
         for(int col = 0; col < nb_cols; col ++) {
             pixels[row * nb_cols + col] = 
                     RGBA(0, (uint8_t)(row + row_offset), 
-                    (uint8_t)(col + col_offset), 0); // TODO: Add RGBA macros 
+                    (uint8_t)(col + col_offset), 0);
         }
     }
 }
 
-static void win32_update_window(HDC device_context, const int x, const int y,
-                const int width, const int height)
+static void win32_display_backbuffer(const win32_backbuffer& backbuffer, 
+                    const HDC device_context,
+                    const int x, const int y, 
+                    const int window_width, const int window_height)
 {
     // TODO: Check if src and dest are correct
     StretchDIBits(
         device_context,
-        x, y, width, height,
-        x, y, g_bitmap_width, g_bitmap_height,
-        g_bitmap, &g_bm_info,
+        x, y, window_width, window_height,
+        x, y, backbuffer.width, backbuffer.height,
+        backbuffer.bitmap, &backbuffer.bm_info,
         DIB_RGB_COLORS,
         SRCCOPY
     );
@@ -83,11 +110,8 @@ LRESULT win32_window_callback(
     LRESULT result = 0;
     switch(message) {
     case WM_SIZE: {
-        RECT client_rect;
-        GetClientRect(window, &client_rect); // TODO: Handle GetClientRect failure? 
-        int width = client_rect.right - client_rect.left;
-        int height = client_rect.bottom - client_rect.top;
-        win32_resize_DIB_section(width, height);
+        win32_window_size window_size = win32_get_window_size(window);
+        win32_resize_DIB_section(g_backbuffer, window_size.width, window_size.height);
     } break;
     case WM_CLOSE: {
         // TODO: display message to user before closing?
@@ -96,25 +120,21 @@ LRESULT win32_window_callback(
         g_running = false;
     } break;
     case WM_DESTROY: {
-        //TODO: Treat this as error and recreate window?
+        // TODO: Treat this as error and recreate window?
         g_running = false;
     } break;
     case WM_PAINT: {
         PAINTSTRUCT paint;
         HDC device_context = BeginPaint(window, &paint);
-        int x = paint.rcPaint.left;
-        int y = paint.rcPaint.top;
-        int width = paint.rcPaint.right - paint.rcPaint.left;
-        int height = paint.rcPaint.bottom - paint.rcPaint.top;
-        draw_gradient(0, 0);
-        // FIXME: Check how we can redraw using the PAINTSTRUCT
-        // instead of the whole screen
-        //win32_update_window(device_context, x, y, width, height);
-        RECT client_rect;
-        GetClientRect(window, &client_rect);
-        width = client_rect.right - client_rect.left;
-        height = client_rect.bottom - client_rect.top;
-        win32_update_window(device_context, 0, 0, width, height);
+        const int x = paint.rcPaint.left;
+        const int y = paint.rcPaint.top;
+        const int width = paint.rcPaint.right - paint.rcPaint.left;
+        const int height = paint.rcPaint.bottom - paint.rcPaint.top;
+        win32_window_size window_size = win32_get_window_size(window);
+        // TODO: See if I want to just pass paint width/height or full window width/heighy 
+        //win32_display_backbuffer(g_backbuffer, device_context, x, y, width, height);
+        win32_display_backbuffer(g_backbuffer, device_context, 0, 0, 
+                        window_size.width, window_size.height);
         EndPaint(window, &paint);
     } break;
     default: {
@@ -134,20 +154,21 @@ int CALLBACK WinMain(
     UNUSED(prev_instance);
     UNUSED(cmd_line);
     UNUSED(show_cmd);
-    // Define window class
-    WNDCLASSEXA window_class = {
+    
+    const WNDCLASSEXA window_class = {
         .cbSize = sizeof(WNDCLASSEXA),
+        .style = CS_HREDRAW | CS_VREDRAW,
         .lpfnWndProc = win32_window_callback,
         .hInstance = instance,
         .lpszClassName = "HandmadeSpaceInvadersWindowClass"
     };
 
     if(RegisterClassExA(&window_class) == 0) {
-        //TODO: Log ERROR && Error handling
-        return -1; //TODO: Find actual code I want to return. 
+        // TODO: Log ERROR && Error handling
+        return -1; // TODO: Find actual code I want to return. 
     }
 
-    HWND window = CreateWindowExA(
+    const HWND window = CreateWindowExA(
                         0, 
                         window_class.lpszClassName,
                         "Handmade Space Invaders", 
@@ -163,12 +184,13 @@ int CALLBACK WinMain(
                     );
 
     if(window == NULL) {
-        //TODO: Log ERROR && Error handling
-        return -1; //TODO: Find actual code I want to return. 
+        // TODO: Log ERROR && Error handling
+        return -1; // TODO: Find actual code I want to return. 
     }
 
-    g_running = 1;
-    int xoffset = 0, yoffset = 0;
+    int xoffset = 0, yoffset = 0; // Used for gradient animation
+    // Processing loop
+    g_running = true;
     while(g_running) {
         MSG message;
         while(PeekMessageA(&message, 0, 0, 0, PM_REMOVE)) {
@@ -178,9 +200,9 @@ int CALLBACK WinMain(
             TranslateMessage(&message);
             DispatchMessageA(&message);
         }
-        draw_gradient(xoffset, yoffset++);
-        HDC hdc = GetDC(window);
-        win32_update_window(hdc, 0, 0, g_bitmap_width, g_bitmap_height);
+        draw_gradient(g_backbuffer, xoffset, yoffset++);
+        const HDC hdc = GetDC(window);
+        win32_display_backbuffer(g_backbuffer, hdc, 0, 0, g_backbuffer.width, g_backbuffer.height);
         ReleaseDC(window, hdc);
     }
 

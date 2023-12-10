@@ -42,16 +42,19 @@ static void win32_resize_DIB_section(const int width, const int height)
                     NULL, width * height * 4, 
                     MEM_COMMIT, PAGE_READWRITE
                 ); 
+    //TODO: Maybe clear this to black
 }
 
-static void draw_gradient()
+static void draw_gradient(int row_offset, int col_offset)
 {
     uint32_t* pixels = (uint32_t*)g_bitmap;
     const int nb_rows = g_bitmap_height;
     const int nb_cols = g_bitmap_width;
     for(int row = 0; row < nb_rows; row ++) {
         for(int col = 0; col < nb_cols; col ++) {
-            pixels[row * nb_cols + col] = RGBA(255, 0, 255, 0); // TODO: Add RGBA macros 
+            pixels[row * nb_cols + col] = 
+                    RGBA(0, (uint8_t)(row + row_offset), 
+                    (uint8_t)(col + col_offset), 0); // TODO: Add RGBA macros 
         }
     }
 }
@@ -103,7 +106,7 @@ LRESULT win32_window_callback(
         int y = paint.rcPaint.top;
         int width = paint.rcPaint.right - paint.rcPaint.left;
         int height = paint.rcPaint.bottom - paint.rcPaint.top;
-        draw_gradient();
+        draw_gradient(0, 0);
         // FIXME: Check how we can redraw using the PAINTSTRUCT
         // instead of the whole screen
         //win32_update_window(device_context, x, y, width, height);
@@ -165,13 +168,20 @@ int CALLBACK WinMain(
     }
 
     g_running = 1;
+    int xoffset = 0, yoffset = 0;
     while(g_running) {
         MSG message;
-        if(GetMessageA(&message, window, 0, 0) <= 0) {
-            break;
+        while(PeekMessageA(&message, 0, 0, 0, PM_REMOVE)) {
+            if(message.message == WM_QUIT) {
+                g_running = false;
+            }
+            TranslateMessage(&message);
+            DispatchMessageA(&message);
         }
-        TranslateMessage(&message);
-        DispatchMessageA(&message);
+        draw_gradient(xoffset, yoffset++);
+        HDC hdc = GetDC(window);
+        win32_update_window(hdc, 0, 0, g_bitmap_width, g_bitmap_height);
+        ReleaseDC(window, hdc);
     }
 
     return 0;

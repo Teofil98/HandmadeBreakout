@@ -7,6 +7,12 @@
 #include <stdio.h> //TODO: Delete after testing done
 #include <stdint.h>
 
+#define RGBA_ALPHA(x) ((uint8_t)x << 24)
+#define RGBA_RED(x) ((uint8_t)x << 16)
+#define RGBA_GREEN(x) ((uint8_t)x << 8)
+#define RGBA_BLUE(x) ((uint8_t)x << 0)
+#define RGBA(r, g, b, a) (RGBA_RED(r) | RGBA_GREEN(g) | RGBA_BLUE(b) | RGBA_ALPHA(a))
+
 static bool g_running;
 static BITMAPINFO g_bm_info;
 static void* g_bitmap;
@@ -45,12 +51,13 @@ static void draw_gradient()
     const int nb_cols = g_bitmap_width;
     for(int row = 0; row < nb_rows; row ++) {
         for(int col = 0; col < nb_cols; col ++) {
-            pixels[row * nb_cols + col] = 0x00FF0000; // TODO: Add RGBA macros 
+            pixels[row * nb_cols + col] = RGBA(255, 0, 255, 0); // TODO: Add RGBA macros 
         }
     }
 }
 
-static void win32_update_window(HDC device_context, const int x, const int y, const int width, const int height)
+static void win32_update_window(HDC device_context, const int x, const int y,
+                const int width, const int height)
 {
     // TODO: Check if src and dest are correct
     StretchDIBits(

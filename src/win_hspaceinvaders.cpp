@@ -14,6 +14,9 @@
 #define RGBA_BLUE(x) ((uint8_t)x << 0)
 #define RGBA(r, g, b, a) (RGBA_RED(r) | RGBA_GREEN(g) | RGBA_BLUE(b) | RGBA_ALPHA(a))
 
+#define DEFAULT_WINDOW_W 1280 
+#define DEFAULT_WINDOW_H 720
+
 struct win32_backbuffer {
     BITMAPINFO bm_info;
     int bytes_per_pixel;
@@ -109,10 +112,6 @@ LRESULT win32_window_callback(
 {
     LRESULT result = 0;
     switch(message) {
-    case WM_SIZE: {
-        win32_window_size window_size = win32_get_window_size(window);
-        win32_resize_DIB_section(g_backbuffer, window_size.width, window_size.height);
-    } break;
     case WM_CLOSE: {
         // TODO: display message to user before closing?
         // TODO: Handle destroy window somewhere, even though windows 
@@ -168,15 +167,28 @@ int CALLBACK WinMain(
         return -1; // TODO: Find actual code I want to return. 
     }
 
+    // This is the desired windows sized such that the client area has desired height/width
+    DWORD window_style = WS_OVERLAPPEDWINDOW;
+    RECT desired_window_rect = {
+        .left = CW_USEDEFAULT,
+        .top = CW_USEDEFAULT,
+        .right = CW_USEDEFAULT + DEFAULT_WINDOW_W,
+        .bottom = CW_USEDEFAULT + DEFAULT_WINDOW_H
+    };
+    win32_window_size desired_window_size;
+    AdjustWindowRectEx(&desired_window_rect, window_style, false, 0);
+    desired_window_size.height = desired_window_rect.bottom - desired_window_rect.top;
+    desired_window_size.width = desired_window_rect.right - desired_window_rect.left;
+
     const HWND window = CreateWindowExA(
                         0, 
                         window_class.lpszClassName,
                         "Handmade Space Invaders", 
-                        WS_OVERLAPPEDWINDOW | WS_VISIBLE, 
+                        window_style | WS_VISIBLE, 
                         CW_USEDEFAULT,
                         CW_USEDEFAULT,
-                        CW_USEDEFAULT,
-                        CW_USEDEFAULT,
+                        desired_window_size.width,
+                        desired_window_size.height,
                         NULL,
                         NULL,
                         instance,
@@ -187,12 +199,14 @@ int CALLBACK WinMain(
         // TODO: Log ERROR && Error handling
         return -1; // TODO: Find actual code I want to return. 
     }
-
+    win32_window_size window_size = win32_get_window_size(window);
+    win32_resize_DIB_section(g_backbuffer, DEFAULT_WINDOW_W, DEFAULT_WINDOW_H);
     int xoffset = 0, yoffset = 0; // Used for gradient animation
     // Processing loop
     g_running = true;
     while(g_running) {
         MSG message;
+        // TODO: Do I want to do a while here?
         while(PeekMessageA(&message, 0, 0, 0, PM_REMOVE)) {
             if(message.message == WM_QUIT) {
                 g_running = false;
@@ -202,7 +216,8 @@ int CALLBACK WinMain(
         }
         draw_gradient(g_backbuffer, xoffset, yoffset++);
         const HDC hdc = GetDC(window);
-        win32_display_backbuffer(g_backbuffer, hdc, 0, 0, g_backbuffer.width, g_backbuffer.height);
+        window_size = win32_get_window_size(window);
+        win32_display_backbuffer(g_backbuffer, hdc, 0, 0, window_size.width, window_size.height);
         ReleaseDC(window, hdc);
     }
 

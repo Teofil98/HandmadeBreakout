@@ -48,7 +48,8 @@ static void win32_resize_DIB_section(win32_backbuffer& backbuffer,
                     const int width, const int height)
 {
     if(backbuffer.bitmap != NULL) {
-        VirtualFree(backbuffer.bitmap, 0, MEM_RELEASE);
+        // FIXME: With fixed buffer, this is no longer called
+        VirtualFree(backbuffer.bitmap, 0, MEM_RELEASE); 
         backbuffer.bitmap = NULL;
     }
     backbuffer.width = width;
@@ -92,7 +93,7 @@ static void win32_display_backbuffer(const win32_backbuffer& backbuffer,
                     const int x, const int y, 
                     const int window_width, const int window_height)
 {
-    // TODO: Check if src and dest are correct
+    // TODO: Correct aspect ratio
     StretchDIBits(
         device_context,
         x, y, window_width, window_height,
@@ -125,13 +126,9 @@ LRESULT win32_window_callback(
     case WM_PAINT: {
         PAINTSTRUCT paint;
         HDC device_context = BeginPaint(window, &paint);
-        const int x = paint.rcPaint.left;
-        const int y = paint.rcPaint.top;
-        const int width = paint.rcPaint.right - paint.rcPaint.left;
-        const int height = paint.rcPaint.bottom - paint.rcPaint.top;
         win32_window_size window_size = win32_get_window_size(window);
-        // TODO: See if I want to just pass paint width/height or full window width/heighy 
-        //win32_display_backbuffer(g_backbuffer, device_context, x, y, width, height);
+        // update whole window. No need to make things more complicated
+        // by updating only dirty part
         win32_display_backbuffer(g_backbuffer, device_context, 0, 0, 
                         window_size.width, window_size.height);
         EndPaint(window, &paint);
@@ -208,6 +205,7 @@ int CALLBACK WinMain(
         MSG message;
         // TODO: Do I want to do a while here?
         while(PeekMessageA(&message, 0, 0, 0, PM_REMOVE)) {
+            // FIXME: Can probably do this check in the switch in the callbacK
             if(message.message == WM_QUIT) {
                 g_running = false;
             }
@@ -218,6 +216,7 @@ int CALLBACK WinMain(
         const HDC hdc = GetDC(window);
         window_size = win32_get_window_size(window);
         win32_display_backbuffer(g_backbuffer, hdc, 0, 0, window_size.width, window_size.height);
+        // TODO: See if I can/should use OWNDC and use the same DC without releasing
         ReleaseDC(window, hdc);
     }
 

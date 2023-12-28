@@ -17,17 +17,26 @@
 #define DEFAULT_WINDOW_W 1280 
 #define DEFAULT_WINDOW_H 720
 
+using uint64 = uint64_t;
+using uint32 = uint32_t;
+using uint16 = uint16_t;
+using uint8  = uint8_t;
+using int64  = int64_t;
+using int32  = int32_t;
+using int16  = int16_t;
+using int8   = int8_t;
+
 struct win32_backbuffer {
     BITMAPINFO bm_info;
-    int bytes_per_pixel;
+    uint32 bytes_per_pixel;
     void* bitmap;
-    int width;
-    int height;
+    uint32 width;
+    uint32 height;
 };
 
 struct win32_window_size {
-    int width;
-    int height;
+    uint32 width;
+    uint32 height;
 };
 
 // TODO: Global variables for now, see later if I want to change them
@@ -45,7 +54,7 @@ static win32_window_size win32_get_window_size(const HWND window)
 }
 
 static void win32_resize_DIB_section(win32_backbuffer& backbuffer, 
-                    const int width, const int height)
+                    const int32 width, const int32 height)
 {
     if(backbuffer.bitmap != NULL) {
         // FIXME: With fixed buffer, this is no longer called
@@ -74,24 +83,24 @@ static void win32_resize_DIB_section(win32_backbuffer& backbuffer,
 }
 
 static void draw_gradient(const win32_backbuffer& backbuffer, 
-                const int row_offset, const int col_offset)
+                const uint32 row_offset, const uint32 col_offset)
 {
     uint32_t* pixels = (uint32_t*)backbuffer.bitmap;
-    const int nb_rows = backbuffer.height;
-    const int nb_cols = backbuffer.width;
-    for(int row = 0; row < nb_rows; row ++) {
-        for(int col = 0; col < nb_cols; col ++) {
+    const uint32 nb_rows = backbuffer.height;
+    const uint32 nb_cols = backbuffer.width;
+    for(uint32 row = 0; row < nb_rows; row ++) {
+        for(uint32 col = 0; col < nb_cols; col ++) {
             pixels[row * nb_cols + col] = 
-                    RGBA(0, (uint8_t)(row + row_offset), 
-                    (uint8_t)(col + col_offset), 0);
+                    RGBA(0, (uint8)(row + row_offset), 
+                    (uint8)(col + col_offset), 0);
         }
     }
 }
 
 static void win32_display_backbuffer(const win32_backbuffer& backbuffer, 
                     const HDC device_context,
-                    const int x, const int y, 
-                    const int window_width, const int window_height)
+                    const int32 x, const int32 y, 
+                    const uint32 window_width, const uint32 window_height)
 {
     // TODO: Correct aspect ratio
     StretchDIBits(
@@ -198,7 +207,7 @@ int CALLBACK WinMain(
     }
     win32_window_size window_size = win32_get_window_size(window);
     win32_resize_DIB_section(g_backbuffer, DEFAULT_WINDOW_W, DEFAULT_WINDOW_H);
-    int xoffset = 0, yoffset = 0; // Used for gradient animation
+    int32 xoffset = 0, yoffset = 0; // Used for gradient animation
     // Processing loop
     g_running = true;
     while(g_running) {

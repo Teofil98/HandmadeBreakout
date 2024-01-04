@@ -142,6 +142,19 @@ LRESULT win32_window_callback(
                         window_size.width, window_size.height);
         EndPaint(window, &paint);
     } break;
+    case WM_SYSKEYDOWN: // fallthrough
+    case WM_SYSKEYUP: // fallthrough
+    case WM_KEYUP: // falthrough
+    case WM_KEYDOWN: {
+        // FIXME: Implement proper {held, pressed, released, os?} button state once 
+        // system independent layer is in progress. 
+        if(w_param == 'W') {
+            printf("W\n");
+        }
+        if(w_param == 'S') {
+            printf("S\n");
+        }
+    } break;
     default: {
         result = DefWindowProcA(window, message, w_param, l_param);
     } 
@@ -173,8 +186,8 @@ int CALLBACK WinMain(
         return -1; // TODO: Find actual code I want to return. 
     }
 
-    // This is the desired windows sized such that the client area has desired height/width
     DWORD window_style = WS_OVERLAPPEDWINDOW;
+    // This is the desired windows sized such that the client area has desired height/width
     RECT desired_window_rect = {
         .left = CW_USEDEFAULT,
         .top = CW_USEDEFAULT,

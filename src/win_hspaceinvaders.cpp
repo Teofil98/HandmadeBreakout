@@ -4,6 +4,8 @@
 #pragma GCC diagnostic warning "-Wunused-but-set-variable"
 
 #include <windows.h>
+#include <objbase.h>
+#include <xaudio2.h>
 #include "include/hspaceinvaders.h"
 #include <stdio.h> // TODO: Delete after testing done
 #include <stdint.h>
@@ -25,6 +27,8 @@ using int64  = int64_t;
 using int32  = int32_t;
 using int16  = int16_t;
 using int8   = int8_t;
+
+// TODO: XINPUT handling for controller support
 
 struct win32_backbuffer {
     BITMAPINFO bm_info;
@@ -77,7 +81,7 @@ static void win32_resize_DIB_section(win32_backbuffer& backbuffer,
     };
     backbuffer.bitmap = VirtualAlloc(
                     NULL, width * height * backbuffer.bytes_per_pixel, 
-                    MEM_COMMIT, PAGE_READWRITE
+                    MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE
                 ); 
     // TODO: Maybe clear this to black
 }
@@ -144,10 +148,11 @@ LRESULT win32_window_callback(
     } break;
     case WM_SYSKEYDOWN: // fallthrough
     case WM_SYSKEYUP: // fallthrough
+    // TODO: Handle ALT+F4
     case WM_KEYUP: // falthrough
     case WM_KEYDOWN: {
         // FIXME: Implement proper {held, pressed, released, os?} button state once 
-        // system independent layer is in progress. 
+        // system independent layer is in progress. (HINT: l_param) 
         if(w_param == 'W') {
             printf("W\n");
         }
@@ -160,6 +165,30 @@ LRESULT win32_window_callback(
     } 
     } // end switch
     return result; 
+}
+
+void win32_xaudio2_init()
+{
+    // initialize COM
+    HRESULT result = CoInitializeEx(0, COINIT_MULTITHREADED);
+    if(FAILED(result)) {
+        // TODO: Log and handle error
+        printf("Error initializing COM\n");
+    }
+
+    IXAudio2* xaudio;
+    result = XAudio2Create(&xaudio, 0, XAUDIO2_DEFAULT_PROCESSOR);
+    if(FAILED(result)) {
+        // TODO: Log and handle error
+        printf("Error initializing xaudio2\n");
+    }
+
+    IXAudio2MasteringVoice* mastering_voice;
+    result = xaudio->CreateMasteringVoice(&mastering_voice);
+    if(FAILED(result)) {
+        // TODO: Log and handle error
+        printf("Error creating mastering voice\n");
+    }
 }
 
 int CALLBACK WinMain(
@@ -221,6 +250,10 @@ int CALLBACK WinMain(
     win32_window_size window_size = win32_get_window_size(window);
     win32_resize_DIB_section(g_backbuffer, DEFAULT_WINDOW_W, DEFAULT_WINDOW_H);
     int32 xoffset = 0, yoffset = 0; // Used for gradient animation
+
+    // Sound initialization
+    win32_xaudio2_init();
+
     // Processing loop
     g_running = true;
     while(g_running) {

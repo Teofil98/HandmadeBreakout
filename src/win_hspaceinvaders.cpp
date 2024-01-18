@@ -43,9 +43,16 @@ struct win32_window_size {
     uint32 height;
 };
 
+struct win32_xaudio2 {
+    IXAudio2* xaudio2;
+    IXAudio2SourceVoice* source_voice; 
+    IXAudio2MasteringVoice* mastering_voice;
+};
+
 // TODO: Global variables for now, see later if I want to change them
 static bool g_running;
 static win32_backbuffer g_backbuffer;
+static win32_xaudio2 g_xaudio2;
 
 static win32_window_size win32_get_window_size(const HWND window)
 {
@@ -167,7 +174,7 @@ LRESULT win32_window_callback(
     return result; 
 }
 
-void win32_xaudio2_init()
+void win32_xaudio2_init(const WAVEFORMATEX* wave_format)
 {
     // initialize COM
     HRESULT result = CoInitializeEx(0, COINIT_MULTITHREADED);
@@ -176,18 +183,23 @@ void win32_xaudio2_init()
         printf("Error initializing COM\n");
     }
 
-    IXAudio2* xaudio;
-    result = XAudio2Create(&xaudio, 0, XAUDIO2_DEFAULT_PROCESSOR);
+    result = XAudio2Create(&g_xaudio2.xaudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
     if(FAILED(result)) {
         // TODO: Log and handle error
         printf("Error initializing xaudio2\n");
     }
 
-    IXAudio2MasteringVoice* mastering_voice;
-    result = xaudio->CreateMasteringVoice(&mastering_voice);
+    result = g_xaudio2.xaudio2->CreateMasteringVoice(&g_xaudio2.mastering_voice);
     if(FAILED(result)) {
         // TODO: Log and handle error
         printf("Error creating mastering voice\n");
+    }
+
+    // TODO: Later on maybe I want creating source voices to be a separate function
+    result = g_xaudio2.xaudio2->CreateSourceVoice(&g_xaudio2.source_voice, wave_format);
+    if(FAILED(result)) {
+        // TODO: Log and handle error
+        printf("Error creating source voice.\n");
     }
 }
 
@@ -252,7 +264,38 @@ int CALLBACK WinMain(
     int32 xoffset = 0, yoffset = 0; // Used for gradient animation
 
     // Sound initialization
-    win32_xaudio2_init();
+    const int32 frequency = 330;
+    const int8 nb_channels = 2;
+    const int32 nb_samples_per_sec = 44100;
+    const int8 bits_per_sample = 16;
+    const int32 block_align = (nb_channels * bits_per_sample)/8;
+    const int32 avg_bytes_per_sec = nb_samples_per_sec * block_align;
+    WAVEFORMATEX wave_format = {
+        .wFormatTag = WAVE_FORMAT_PCM, // TODO: See if this is the format I want to use
+        .nChannels = nb_channels,
+        .nSamplesPerSec = nb_samples_per_sec,
+        .nAvgBytesPerSec = avg_bytes_per_sec,
+        .nBlockAlign = block_align,
+        .wBitsPerSample = bits_per_sample,
+        .cbSize = 0        
+    };
+
+    win32_xaudio2_init(&wave_format);
+    const int32 sound_buffer_size = avg_bytes_per_sec; // TODO: See how much I want this value to be
+    XAUDIO2_BUFFER sound_buffer = {
+        .Flags = 0,
+        .AudioBytes = sound_buffer_size, 
+        .pAudioData =  (uint8*) VirtualAlloc(
+                    NULL, sound_buffer_size, 
+                    MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE
+                ),
+        .PlayBegin = 0,
+        .PlayLength = 0,
+        .LoopBegin = 0,
+        .LoopLength = nb_samples_per_sec,
+        .LoopCount = XAUDIO2_LOOP_INFINITE,
+        .pContext = NULL
+    };
 
     // Processing loop
     g_running = true;

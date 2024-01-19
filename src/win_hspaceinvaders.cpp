@@ -51,8 +51,8 @@ struct win32_xaudio2 {
 
 // TODO: Global variables for now, see later if I want to change them
 static bool g_running;
-static win32_backbuffer g_backbuffer;
-static win32_xaudio2 g_xaudio2;
+static win32_backbuffer g_backbuffer; // TODO: See when/if to free this
+static win32_xaudio2 g_xaudio2; // TODO: See when/if/how to free stuff inside this
 
 static win32_window_size win32_get_window_size(const HWND window)
 {
@@ -203,6 +203,22 @@ void win32_xaudio2_init(const WAVEFORMATEX* wave_format)
     }
 }
 
+void win32_write_square_wave(XAUDIO2_BUFFER* xaudio2_buffer, const uint32 frequency, const int tone_volume)
+{
+    // TODO: Consider if I want to have non 16b/sample  audio
+    // TODO: xaudio2_buffer->NbBytes should be multiple of 2, maybe assert
+    uint16* buffer = (uint16*)xaudio2_buffer->pAudioData;
+    int32 nb_samples = xaudio2_buffer->AudioBytes/2;
+    for(int i = 0; i < nb_samples; i += 2)
+    {
+        //TODO: Maybe I actaully need to toggle every frequency/2 bytes
+        int sign = (i / frequency) % 2 == 0 ? 1 : -1;
+        // set left and right samples
+        buffer[i] = sign * tone_volume;
+        buffer[i + 1] = sign * tone_volume;
+    }
+}
+
 int CALLBACK WinMain(
     HINSTANCE instance,
     HINSTANCE prev_instance,
@@ -264,7 +280,6 @@ int CALLBACK WinMain(
     int32 xoffset = 0, yoffset = 0; // Used for gradient animation
 
     // Sound initialization
-    const int32 frequency = 330;
     const int8 nb_channels = 2;
     const int32 nb_samples_per_sec = 44100;
     const int8 bits_per_sample = 16;
@@ -296,6 +311,23 @@ int CALLBACK WinMain(
         .LoopCount = XAUDIO2_LOOP_INFINITE,
         .pContext = NULL
     };
+
+    const uint32 frequency = 330;
+    const int32 tone_volume = 800;
+    win32_write_square_wave(&sound_buffer, frequency, tone_volume);
+
+    // TODO: Probably want submitting a buffer and playing to be one or more separate functions
+    HRESULT result = g_xaudio2.source_voice->SubmitSourceBuffer(&sound_buffer);
+    if(FAILED(result)) {
+        // TODO: Log and handle error
+        printf("Error submitting sound buffer to source voice\n");
+    }
+
+    result = g_xaudio2.source_voice->Start(0);
+    if(FAILED(result)) {
+        // TODO: Log and handle error
+        printf("Error playing sound buffer on source voice\n");
+    }
 
     // Processing loop
     g_running = true;

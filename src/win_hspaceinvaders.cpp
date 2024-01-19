@@ -209,10 +209,15 @@ void win32_write_square_wave(XAUDIO2_BUFFER* xaudio2_buffer, const uint32 freque
     // TODO: xaudio2_buffer->NbBytes should be multiple of 2, maybe assert
     uint16* buffer = (uint16*)xaudio2_buffer->pAudioData;
     int32 nb_samples = xaudio2_buffer->AudioBytes/2;
+    // TODO:  For now, I assume that the buffer lasts for 1 second
+    // FIXME: Deal with buffers that have length more than 1 sec
+    const uint32 square_wave_period = nb_samples / frequency;
+    const uint32 half_period = square_wave_period / 2; 
+
     for(int i = 0; i < nb_samples; i += 2)
     {
         //TODO: Maybe I actaully need to toggle every frequency/2 bytes
-        int sign = (i / frequency) % 2 == 0 ? 1 : -1;
+        int sign = (i / half_period) % 2 == 0 ? 1 : -1;
         // set left and right samples
         buffer[i] = sign * tone_volume;
         buffer[i + 1] = sign * tone_volume;

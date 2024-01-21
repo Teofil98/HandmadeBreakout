@@ -9,6 +9,7 @@
 #include "include/hspaceinvaders.h"
 #include <stdio.h> // TODO: Delete after testing done
 #include <stdint.h>
+#include <math.h> // TODO: replace functions here with own implementation
 
 #define RGBA_ALPHA(x) ((uint8_t)x << 24)
 #define RGBA_RED(x) ((uint8_t)x << 16)
@@ -19,14 +20,18 @@
 #define DEFAULT_WINDOW_W 1280 
 #define DEFAULT_WINDOW_H 720
 
-using uint64 = uint64_t;
-using uint32 = uint32_t;
-using uint16 = uint16_t;
-using uint8  = uint8_t;
-using int64  = int64_t;
-using int32  = int32_t;
-using int16  = int16_t;
-using int8   = int8_t;
+#define PI 3.14159265359
+
+using uint64  = uint64_t;
+using uint32  = uint32_t;
+using uint16  = uint16_t;
+using uint8   = uint8_t;
+using int64   = int64_t;
+using int32   = int32_t;
+using int16   = int16_t;
+using int8    = int8_t;
+using float32 = float;
+using float64 = double;
 
 // TODO: XINPUT handling for controller support
 
@@ -203,6 +208,7 @@ void win32_xaudio2_init(const WAVEFORMATEX* wave_format)
     }
 }
 
+// FIXME: Certain frequencies produce audible skip
 void win32_write_square_wave(XAUDIO2_BUFFER* xaudio2_buffer, const uint32 frequency, const int tone_volume)
 {
     // TODO: Consider if I want to have non 16b/sample  audio
@@ -216,11 +222,31 @@ void win32_write_square_wave(XAUDIO2_BUFFER* xaudio2_buffer, const uint32 freque
 
     for(int i = 0; i < nb_samples; i += 2)
     {
-        //TODO: Maybe I actaully need to toggle every frequency/2 bytes
         int sign = (i / half_period) % 2 == 0 ? 1 : -1;
         // set left and right samples
         buffer[i] = sign * tone_volume;
         buffer[i + 1] = sign * tone_volume;
+    }
+}
+
+void win32_write_sin_wave(XAUDIO2_BUFFER* xaudio2_buffer, const uint32 frequency, const int tone_volume)
+{
+    // TODO: Consider if I want to have non 16b/sample  audio
+    // TODO: xaudio2_buffer->NbBytes should be multiple of 2, maybe assert
+    uint16* buffer = (uint16*)xaudio2_buffer->pAudioData;
+    int32 nb_samples = xaudio2_buffer->AudioBytes/2;
+    // TODO:  For now, I assume that the buffer lasts for 1 second
+    // FIXME: Deal with buffers that have length more than 1 sec
+    const uint32 wave_period = nb_samples / frequency;
+
+    for(int i = 0; i < nb_samples; i += 2)
+    {
+        // Where in the sin wave we are, in radians
+        float32 sin_location = 2 * PI * ((i % wave_period) / (float32) wave_period); 
+        float32 sin_value = sinf(sin_location);
+        // set left and right samples
+        buffer[i] = (uint16) (sin_value * tone_volume);
+        buffer[i + 1] = (uint16) (sin_value * tone_volume);
     }
 }
 
@@ -317,10 +343,10 @@ int CALLBACK WinMain(
         .pContext = NULL
     };
 
-    const uint32 frequency = 330;
-    const int32 tone_volume = 800;
-    win32_write_square_wave(&sound_buffer, frequency, tone_volume);
-
+    const uint32 frequency = 440;
+    const int32 tone_volume = 2200;
+    //win32_write_square_wave(&sound_buffer, frequency, tone_volume);
+    win32_write_sin_wave(&sound_buffer, frequency, tone_volume);
     // TODO: Probably want submitting a buffer and playing to be one or more separate functions
     HRESULT result = g_xaudio2.source_voice->SubmitSourceBuffer(&sound_buffer);
     if(FAILED(result)) {

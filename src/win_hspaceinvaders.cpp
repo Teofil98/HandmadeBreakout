@@ -360,6 +360,10 @@ int CALLBACK WinMain(
         printf("Error playing sound buffer on source voice\n");
     }
 
+    LARGE_INTEGER counter_frequency;
+    QueryPerformanceFrequency(&counter_frequency);
+    LARGE_INTEGER last_measurement;
+    QueryPerformanceCounter(&last_measurement);
     // Processing loop
     g_running = true;
     while(g_running) {
@@ -379,6 +383,14 @@ int CALLBACK WinMain(
         win32_display_backbuffer(g_backbuffer, hdc, 0, 0, window_size.width, window_size.height);
         // TODO: See if I can/should use OWNDC and use the same DC without releasing
         ReleaseDC(window, hdc);
+        LARGE_INTEGER current_measurement;
+        QueryPerformanceCounter(&current_measurement);
+        uint64 elapsed_time = (current_measurement.QuadPart - last_measurement.QuadPart);
+        //convert to us
+        elapsed_time *= 1000;
+        elapsed_time /= counter_frequency.QuadPart;
+        last_measurement = current_measurement;
+        printf("%lld ms, %lld fps\n", elapsed_time, 1000/(elapsed_time));
     }
 
     return 0;

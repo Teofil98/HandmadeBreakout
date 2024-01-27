@@ -1,0 +1,110 @@
+#include "include/hspaceinvaders.h"
+#include "include/platform_layer.h"
+#include "include/defines.h"
+#include <math.h> // TODO: replace functions here with own implementation
+#include <stdio.h> // TODO: Delete once testing done
+void draw_gradient(const platform_backbuffer* backbuffer, 
+                const uint32 row_offset, const uint32 col_offset)
+{
+    uint32_t* pixels = (uint32_t*)backbuffer->bitmap;
+    const uint32 nb_rows = backbuffer->height;
+    const uint32 nb_cols = backbuffer->width;
+    for(uint32 row = 0; row < nb_rows; row ++) {
+        for(uint32 col = 0; col < nb_cols; col ++) {
+            pixels[row * nb_cols + col] = 
+                    RGBA(0, (uint8)(row + row_offset), 
+                    (uint8)(col + col_offset), 0);
+        }
+    }
+}
+
+// FIXME: Certain frequencies produce audible skip
+void write_square_wave(platform_sound_buffer* buffer, const uint32 frequency, const int tone_volume)
+{
+    // TODO: Consider if I want to have non 16b/sample  audio
+    // TODO: xaudio2_buffer->NbBytes should be multiple of 2, maybe assert
+    uint16* audio_buffer = (uint16*)buffer->buffer;
+    int32 nb_samples = buffer->size_bytes/2;
+    // TODO:  For now, I assume that the buffer lasts for 1 second
+    // FIXME: Deal with buffers that have length more than 1 sec
+    const uint32 square_wave_period = nb_samples / frequency;
+    const uint32 half_period = square_wave_period / 2; 
+
+    for(int i = 0; i < nb_samples; i += 2)
+    {
+        int sign = (i / half_period) % 2 == 0 ? 1 : -1;
+        // set left and right samples
+        audio_buffer[i] = sign * tone_volume;
+       audio_buffer[i + 1] = sign * tone_volume;
+    }
+}
+
+void write_sin_wave(platform_sound_buffer* buffer, const uint32 frequency, const int tone_volume)
+{
+    // TODO: Consider if I want to have non 16b/sample  audio
+    // TODO: xaudio2_buffer->NbBytes should be multiple of 2, maybe assert
+    uint16* audio_buffer = (uint16*)buffer->buffer;
+    int32 nb_samples = buffer->size_bytes/2;
+    // TODO:  For now, I assume that the buffer lasts for 1 second
+    // FIXME: Deal with buffers that have length more than 1 sec
+    const uint32 wave_period = nb_samples / frequency;
+
+    for(int i = 0; i < nb_samples; i += 2)
+    {
+        // Where in the sin wave we are, in radians
+        float32 sin_location = 2 * PI * ((i % wave_period) / (float32) wave_period); 
+        float32 sin_value = sinf(sin_location);
+        // set left and right samples
+        audio_buffer[i] = (uint16) (sin_value * tone_volume);
+        audio_buffer[i + 1] = (uint16) (sin_value * tone_volume);
+    }
+}
+
+platform_window* g_window;
+platform_backbuffer* g_backbuffer;
+platform_sound_buffer* g_sound_buffer;
+void game_init(void)
+{
+    g_window = open_window("Handmade Space Invader", DEFAULT_WINDOW_W, DEFAULT_WINDOW_H);
+    g_backbuffer = create_backbuffer(DEFAULT_WINDOW_W, DEFAULT_WINDOW_H, 4);
+    const uint8 channels = 2;
+    const uint32 nb_samples_per_sec = 44100;
+    const uint8 bits_per_sample = 16;
+    init_sound(channels, nb_samples_per_sec, bits_per_sample);
+    g_sound_buffer = create_sound_buffer();
+}
+
+void fill_red(platform_backbuffer* backbuffer)
+{
+    uint32* pixels = (uint32*)backbuffer->bitmap;
+    const uint32 nb_rows = backbuffer->height;
+    const uint32 nb_cols = backbuffer->width;
+    for(uint32 row = 0; row < nb_rows; row ++) {
+        for(uint32 col = 0; col < nb_cols; col ++) {
+            pixels[row * nb_cols + col] = RGBA(200, 1, 2, 0);
+        }
+    }
+}
+
+void game_main(void)
+{
+    game_init();
+    int32 xoffset = 0, yoffset = 0; // Used for gradient animation
+    play_sound_buffer(g_sound_buffer);    
+    write_sin_wave(g_sound_buffer, 440, 1600);
+    uint64 last_measurement = get_timer();
+    uint64 timer_freq = get_timer_frequency();
+    while(!should_close()) {
+        poll_platform_messages();
+        draw_gradient(g_backbuffer, xoffset, yoffset++);
+        display_backbuffer(g_backbuffer, g_window);
+        uint64 current_measurement = get_timer();
+        uint64 elapsed_time = current_measurement - last_measurement;
+        //convert to ms
+        elapsed_time *= 1000;
+        elapsed_time /= timer_freq;
+        last_measurement = current_measurement;
+
+        printf("%lld ms, %lld fps\n", elapsed_time, 1000/(elapsed_time));
+    }
+}

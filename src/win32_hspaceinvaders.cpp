@@ -1,46 +1,14 @@
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers" 
-#pragma GCC diagnostic warning "-Wunused-function"
-#pragma GCC diagnostic warning "-Wunused-variable"
-#pragma GCC diagnostic warning "-Wunused-but-set-variable"
-
 #include <windows.h>
 #include <objbase.h>
 #include <xaudio2.h>
-#include "include/hspaceinvaders.h"
 #include <stdio.h> // TODO: Delete after testing done
-#include <stdint.h>
-#include <math.h> // TODO: replace functions here with own implementation
-
-#define RGBA_ALPHA(x) ((uint8_t)x << 24)
-#define RGBA_RED(x) ((uint8_t)x << 16)
-#define RGBA_GREEN(x) ((uint8_t)x << 8)
-#define RGBA_BLUE(x) ((uint8_t)x << 0)
-#define RGBA(r, g, b, a) (RGBA_RED(r) | RGBA_GREEN(g) | RGBA_BLUE(b) | RGBA_ALPHA(a))
-
-#define DEFAULT_WINDOW_W 1280 
-#define DEFAULT_WINDOW_H 720
-
-#define PI 3.14159265359
-
-using uint64  = uint64_t;
-using uint32  = uint32_t;
-using uint16  = uint16_t;
-using uint8   = uint8_t;
-using int64   = int64_t;
-using int32   = int32_t;
-using int16   = int16_t;
-using int8    = int8_t;
-using float32 = float;
-using float64 = double;
-
+#include "include/defines.h"
+#include "include/hspaceinvaders.h"
+#include "include/platform_layer.h"
 // TODO: XINPUT handling for controller support
 
-struct win32_backbuffer {
+struct platform_backbuffer_context {
     BITMAPINFO bm_info;
-    uint32 bytes_per_pixel;
-    void* bitmap;
-    uint32 width;
-    uint32 height;
 };
 
 struct win32_window_size {
@@ -54,10 +22,25 @@ struct win32_xaudio2 {
     IXAudio2MasteringVoice* mastering_voice;
 };
 
+struct win32_context {
+    HINSTANCE program_instance;
+    WAVEFORMATEX wave_format;
+};
+
+struct platform_window_context {
+    HWND window_handle;
+};
+
+struct platform_sound_buffer_context {
+    XAUDIO2_BUFFER buffer;
+};
+
 // TODO: Global variables for now, see later if I want to change them
 static bool g_running;
-static win32_backbuffer g_backbuffer; // TODO: See when/if to free this
+// TODO: Only needed for WM_PAINT, see if I want to keep it or not
+static platform_backbuffer* g_backbuffer; // TODO: See when/if to free this
 static win32_xaudio2 g_xaudio2; // TODO: See when/if/how to free stuff inside this
+static win32_context g_context; 
 
 static win32_window_size win32_get_window_size(const HWND window)
 {
@@ -69,51 +52,37 @@ static win32_window_size win32_get_window_size(const HWND window)
     return size;
 }
 
-static void win32_resize_DIB_section(win32_backbuffer& backbuffer, 
-                    const int32 width, const int32 height)
+
+platform_backbuffer* create_backbuffer(const uint32 width, const uint32 height, const uint32 bytes_per_pixel)
 {
-    if(backbuffer.bitmap != NULL) {
-        // FIXME: With fixed buffer, this is no longer called
-        VirtualFree(backbuffer.bitmap, 0, MEM_RELEASE); 
-        backbuffer.bitmap = NULL;
-    }
-    backbuffer.width = width;
-    backbuffer.height = height;
-    backbuffer.bytes_per_pixel = 4;
-    backbuffer.bm_info = {
+    platform_backbuffer* backbuffer = new platform_backbuffer;
+    backbuffer->context = new platform_backbuffer_context;
+    backbuffer->width = width;
+    backbuffer->height = height;
+    backbuffer->bytes_per_pixel = bytes_per_pixel;
+    backbuffer->context->bm_info = {
         .bmiHeader = {
             .biSize = sizeof(BITMAPINFOHEADER),
-            .biWidth = width,
+            .biWidth = (int32)width,
             // Negative height to create a top-down DIB
-            .biHeight = -height,
+            .biHeight = -(int32)height,
             .biPlanes = 1,
             .biBitCount = 32,
             .biCompression = BI_RGB
         }
     };
-    backbuffer.bitmap = VirtualAlloc(
-                    NULL, width * height * backbuffer.bytes_per_pixel, 
+    backbuffer->bitmap = VirtualAlloc(
+                    NULL, width * height * backbuffer->bytes_per_pixel, 
                     MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE
                 ); 
+    // TODO: Delete after testing
+    g_backbuffer = backbuffer;
     // TODO: Maybe clear this to black
+    return backbuffer;
 }
 
-static void draw_gradient(const win32_backbuffer& backbuffer, 
-                const uint32 row_offset, const uint32 col_offset)
-{
-    uint32_t* pixels = (uint32_t*)backbuffer.bitmap;
-    const uint32 nb_rows = backbuffer.height;
-    const uint32 nb_cols = backbuffer.width;
-    for(uint32 row = 0; row < nb_rows; row ++) {
-        for(uint32 col = 0; col < nb_cols; col ++) {
-            pixels[row * nb_cols + col] = 
-                    RGBA(0, (uint8)(row + row_offset), 
-                    (uint8)(col + col_offset), 0);
-        }
-    }
-}
 
-static void win32_display_backbuffer(const win32_backbuffer& backbuffer, 
+static void win32_display_backbuffer(const platform_backbuffer* backbuffer, 
                     const HDC device_context,
                     const int32 x, const int32 y, 
                     const uint32 window_width, const uint32 window_height)
@@ -122,8 +91,8 @@ static void win32_display_backbuffer(const win32_backbuffer& backbuffer,
     StretchDIBits(
         device_context,
         x, y, window_width, window_height,
-        x, y, backbuffer.width, backbuffer.height,
-        backbuffer.bitmap, &backbuffer.bm_info,
+        x, y, backbuffer->width, backbuffer->height,
+        backbuffer->bitmap, &backbuffer->context->bm_info,
         DIB_RGB_COLORS,
         SRCCOPY
     );
@@ -148,6 +117,7 @@ LRESULT win32_window_callback(
         // TODO: Treat this as error and recreate window?
         g_running = false;
     } break;
+    // TODO: Decide if I want to keep WM_PAINT or not, as it needs some ugly global variables
     case WM_PAINT: {
         PAINTSTRUCT paint;
         HDC device_context = BeginPaint(window, &paint);
@@ -170,6 +140,9 @@ LRESULT win32_window_callback(
         }
         if(w_param == 'S') {
             printf("S\n");
+        }
+        if(w_param == VK_ESCAPE) {
+            g_running = false;
         }
     } break;
     default: {
@@ -208,46 +181,174 @@ void win32_xaudio2_init(const WAVEFORMATEX* wave_format)
     }
 }
 
-// FIXME: Certain frequencies produce audible skip
-void win32_write_square_wave(XAUDIO2_BUFFER* xaudio2_buffer, const uint32 frequency, const int tone_volume)
+platform_window* open_window(const char* title, const uint32 width, const uint32 height)
 {
-    // TODO: Consider if I want to have non 16b/sample  audio
-    // TODO: xaudio2_buffer->NbBytes should be multiple of 2, maybe assert
-    uint16* buffer = (uint16*)xaudio2_buffer->pAudioData;
-    int32 nb_samples = xaudio2_buffer->AudioBytes/2;
-    // TODO:  For now, I assume that the buffer lasts for 1 second
-    // FIXME: Deal with buffers that have length more than 1 sec
-    const uint32 square_wave_period = nb_samples / frequency;
-    const uint32 half_period = square_wave_period / 2; 
+    const WNDCLASSEXA window_class = {
+        .cbSize = sizeof(WNDCLASSEXA),
+        .style = CS_HREDRAW | CS_VREDRAW,
+        .lpfnWndProc = win32_window_callback,
+        .hInstance = g_context.program_instance,
+        .lpszClassName = "HandmadeSpaceInvadersWindowClass"
+    };
+    if(RegisterClassExA(&window_class) == 0) {
+        // TODO: Log ERROR && Error handling
+        printf("Error, could not register window class\n");
+        //return -1; // TODO: Find actual code I want to return. 
+    }
 
-    for(int i = 0; i < nb_samples; i += 2)
-    {
-        int sign = (i / half_period) % 2 == 0 ? 1 : -1;
-        // set left and right samples
-        buffer[i] = sign * tone_volume;
-        buffer[i + 1] = sign * tone_volume;
+    DWORD window_style = WS_OVERLAPPEDWINDOW;
+    // This is the desired windows sized such that the client area has desired height/width
+    RECT desired_window_rect = {
+        .left = CW_USEDEFAULT,
+        .top = CW_USEDEFAULT,
+        .right = CW_USEDEFAULT + (int32)width,
+        .bottom = CW_USEDEFAULT + (int32)height 
+    };
+    win32_window_size desired_window_size;
+    AdjustWindowRectEx(&desired_window_rect, window_style, false, 0);
+    desired_window_size.height = desired_window_rect.bottom - desired_window_rect.top;
+    desired_window_size.width = desired_window_rect.right - desired_window_rect.left;
+
+    const HWND window = CreateWindowExA(
+                        0, 
+                        window_class.lpszClassName,
+                        title, 
+                        window_style | WS_VISIBLE, 
+                        CW_USEDEFAULT,
+                        CW_USEDEFAULT,
+                        desired_window_size.width,
+                        desired_window_size.height,
+                        NULL,
+                        NULL,
+                        g_context.program_instance,
+                        NULL
+                    );
+
+    if(window == NULL) {
+        // TODO: Log ERROR && Error handling
+        printf("Error, could not create window");
+        //return -1; // TODO: Find actual code I want to return. 
+    }
+
+
+    platform_window* plat_window = new platform_window; 
+    plat_window->context = new platform_window_context;
+    plat_window->context->window_handle = window;
+    //plat_window->width = width;
+    //plat_window->height = height;
+    return plat_window;
+ }
+
+void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec, const uint8 bits_per_sample)
+{
+    const uint16 block_align = (nb_channels * bits_per_sample)/8;
+    const uint32 avg_bytes_per_sec = nb_samples_per_sec * block_align;
+    g_context.wave_format = {
+        .wFormatTag = WAVE_FORMAT_PCM, // TODO: See if this is the format I want to use
+        .nChannels = nb_channels,
+        .nSamplesPerSec = nb_samples_per_sec,
+        .nAvgBytesPerSec = avg_bytes_per_sec,
+        .nBlockAlign = block_align,
+        .wBitsPerSample = bits_per_sample,
+        .cbSize = 0        
+    };
+
+    win32_xaudio2_init(&g_context.wave_format);
+}
+
+platform_sound_buffer* create_sound_buffer(void)
+{
+    platform_sound_buffer* sound_buffer = new platform_sound_buffer;
+    sound_buffer->context = new platform_sound_buffer_context;
+    
+    const uint32 sound_buffer_size = g_context.wave_format.nAvgBytesPerSec; // TODO: See how much I want this value to be
+    void* platform_sound_buffer = VirtualAlloc(
+                    NULL, sound_buffer_size, 
+                    MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE
+                );
+    sound_buffer->buffer = platform_sound_buffer;
+    sound_buffer->bits_per_sample = g_context.wave_format.wBitsPerSample;
+    sound_buffer->nb_samples_per_sec = g_context.wave_format.nSamplesPerSec;
+    sound_buffer->nb_channels = g_context.wave_format.nChannels;
+    sound_buffer->size_bytes = sound_buffer_size;
+    sound_buffer->context->buffer = {
+        .Flags = 0,
+        .AudioBytes = sound_buffer_size, 
+        .pAudioData =  (uint8*)platform_sound_buffer, 
+        .PlayBegin = 0,
+        .PlayLength = 0,
+        .LoopBegin = 0,
+        .LoopLength = g_context.wave_format.nSamplesPerSec,
+        .LoopCount = XAUDIO2_LOOP_INFINITE,
+        .pContext = NULL
+    };
+
+    return sound_buffer;
+}
+
+void play_sound_buffer(platform_sound_buffer* sound_buffer)
+{
+    // TODO: Probably want submitting a buffer and playing to be one or more separate functions
+    HRESULT result = g_xaudio2.source_voice->SubmitSourceBuffer(&sound_buffer->context->buffer);
+    if(FAILED(result)) {
+        // TODO: Log and handle error
+        printf("Error submitting sound buffer to source voice\n");
+    }
+
+    result = g_xaudio2.source_voice->Start(0);
+    if(FAILED(result)) {
+        // TODO: Log and handle error
+        printf("Error playing sound buffer on source voice\n");
     }
 }
 
-void win32_write_sin_wave(XAUDIO2_BUFFER* xaudio2_buffer, const uint32 frequency, const int tone_volume)
+uint64 get_timer(void)
 {
-    // TODO: Consider if I want to have non 16b/sample  audio
-    // TODO: xaudio2_buffer->NbBytes should be multiple of 2, maybe assert
-    uint16* buffer = (uint16*)xaudio2_buffer->pAudioData;
-    int32 nb_samples = xaudio2_buffer->AudioBytes/2;
-    // TODO:  For now, I assume that the buffer lasts for 1 second
-    // FIXME: Deal with buffers that have length more than 1 sec
-    const uint32 wave_period = nb_samples / frequency;
+    LARGE_INTEGER measurement;
+    QueryPerformanceCounter(&measurement);
+    return measurement.QuadPart;
+}
 
-    for(int i = 0; i < nb_samples; i += 2)
-    {
-        // Where in the sin wave we are, in radians
-        float32 sin_location = 2 * PI * ((i % wave_period) / (float32) wave_period); 
-        float32 sin_value = sinf(sin_location);
-        // set left and right samples
-        buffer[i] = (uint16) (sin_value * tone_volume);
-        buffer[i + 1] = (uint16) (sin_value * tone_volume);
+uint64 get_timer_frequency(void)
+{
+    LARGE_INTEGER counter_frequency;
+    QueryPerformanceFrequency(&counter_frequency);
+    return counter_frequency.QuadPart; 
+}
+
+void poll_platform_messages(void)
+{
+    MSG message;
+    // TODO: Do I want to do a while here?
+    while(PeekMessageA(&message, 0, 0, 0, PM_REMOVE)) {
+        // FIXME: Can probably do this check in the switch in the callbacK
+        if(message.message == WM_QUIT) {
+            g_running = false;
+        }
+        TranslateMessage(&message);
+        DispatchMessageA(&message);
     }
+}
+
+void display_backbuffer(const platform_backbuffer* backbuffer, const platform_window* window)
+{
+    const HDC hdc = GetDC(window->context->window_handle);
+    win32_window_size window_size = win32_get_window_size(window->context->window_handle);
+    StretchDIBits(
+        hdc,
+        0, 0, window_size.width, window_size.height,
+        0, 0, backbuffer->width, backbuffer->height,
+        backbuffer->bitmap, &backbuffer->context->bm_info,
+        DIB_RGB_COLORS,
+        SRCCOPY
+    );
+    // TODO: See if I can/should use OWNDC and use the same DC without releasing
+      
+}
+
+bool should_close() 
+{
+    return !g_running;
 }
 
 int CALLBACK WinMain(
@@ -260,138 +361,12 @@ int CALLBACK WinMain(
     UNUSED(prev_instance);
     UNUSED(cmd_line);
     UNUSED(show_cmd);
-    
-    const WNDCLASSEXA window_class = {
-        .cbSize = sizeof(WNDCLASSEXA),
-        .style = CS_HREDRAW | CS_VREDRAW,
-        .lpfnWndProc = win32_window_callback,
-        .hInstance = instance,
-        .lpszClassName = "HandmadeSpaceInvadersWindowClass"
-    };
-
-    if(RegisterClassExA(&window_class) == 0) {
-        // TODO: Log ERROR && Error handling
-        return -1; // TODO: Find actual code I want to return. 
-    }
-
-    DWORD window_style = WS_OVERLAPPEDWINDOW;
-    // This is the desired windows sized such that the client area has desired height/width
-    RECT desired_window_rect = {
-        .left = CW_USEDEFAULT,
-        .top = CW_USEDEFAULT,
-        .right = CW_USEDEFAULT + DEFAULT_WINDOW_W,
-        .bottom = CW_USEDEFAULT + DEFAULT_WINDOW_H
-    };
-    win32_window_size desired_window_size;
-    AdjustWindowRectEx(&desired_window_rect, window_style, false, 0);
-    desired_window_size.height = desired_window_rect.bottom - desired_window_rect.top;
-    desired_window_size.width = desired_window_rect.right - desired_window_rect.left;
-
-    const HWND window = CreateWindowExA(
-                        0, 
-                        window_class.lpszClassName,
-                        "Handmade Space Invaders", 
-                        window_style | WS_VISIBLE, 
-                        CW_USEDEFAULT,
-                        CW_USEDEFAULT,
-                        desired_window_size.width,
-                        desired_window_size.height,
-                        NULL,
-                        NULL,
-                        instance,
-                        NULL
-                    );
-
-    if(window == NULL) {
-        // TODO: Log ERROR && Error handling
-        return -1; // TODO: Find actual code I want to return. 
-    }
-    win32_window_size window_size = win32_get_window_size(window);
-    win32_resize_DIB_section(g_backbuffer, DEFAULT_WINDOW_W, DEFAULT_WINDOW_H);
-    int32 xoffset = 0, yoffset = 0; // Used for gradient animation
-
-    // Sound initialization
-    const int8 nb_channels = 2;
-    const int32 nb_samples_per_sec = 44100;
-    const int8 bits_per_sample = 16;
-    const int32 block_align = (nb_channels * bits_per_sample)/8;
-    const int32 avg_bytes_per_sec = nb_samples_per_sec * block_align;
-    WAVEFORMATEX wave_format = {
-        .wFormatTag = WAVE_FORMAT_PCM, // TODO: See if this is the format I want to use
-        .nChannels = nb_channels,
-        .nSamplesPerSec = nb_samples_per_sec,
-        .nAvgBytesPerSec = avg_bytes_per_sec,
-        .nBlockAlign = block_align,
-        .wBitsPerSample = bits_per_sample,
-        .cbSize = 0        
-    };
-
-    win32_xaudio2_init(&wave_format);
-    const int32 sound_buffer_size = avg_bytes_per_sec; // TODO: See how much I want this value to be
-    XAUDIO2_BUFFER sound_buffer = {
-        .Flags = 0,
-        .AudioBytes = sound_buffer_size, 
-        .pAudioData =  (uint8*) VirtualAlloc(
-                    NULL, sound_buffer_size, 
-                    MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE
-                ),
-        .PlayBegin = 0,
-        .PlayLength = 0,
-        .LoopBegin = 0,
-        .LoopLength = nb_samples_per_sec,
-        .LoopCount = XAUDIO2_LOOP_INFINITE,
-        .pContext = NULL
-    };
-
-    const uint32 frequency = 440;
-    const int32 tone_volume = 2200;
-    //win32_write_square_wave(&sound_buffer, frequency, tone_volume);
-    win32_write_sin_wave(&sound_buffer, frequency, tone_volume);
-    // TODO: Probably want submitting a buffer and playing to be one or more separate functions
-    HRESULT result = g_xaudio2.source_voice->SubmitSourceBuffer(&sound_buffer);
-    if(FAILED(result)) {
-        // TODO: Log and handle error
-        printf("Error submitting sound buffer to source voice\n");
-    }
-
-    result = g_xaudio2.source_voice->Start(0);
-    if(FAILED(result)) {
-        // TODO: Log and handle error
-        printf("Error playing sound buffer on source voice\n");
-    }
-
-    LARGE_INTEGER counter_frequency;
-    QueryPerformanceFrequency(&counter_frequency);
-    LARGE_INTEGER last_measurement;
-    QueryPerformanceCounter(&last_measurement);
-    // Processing loop
+  
+    // Set up the global context for the win32 platform
+    g_context.program_instance = instance;
     g_running = true;
-    while(g_running) {
-        MSG message;
-        // TODO: Do I want to do a while here?
-        while(PeekMessageA(&message, 0, 0, 0, PM_REMOVE)) {
-            // FIXME: Can probably do this check in the switch in the callbacK
-            if(message.message == WM_QUIT) {
-                g_running = false;
-            }
-            TranslateMessage(&message);
-            DispatchMessageA(&message);
-        }
-        draw_gradient(g_backbuffer, xoffset, yoffset++);
-        const HDC hdc = GetDC(window);
-        window_size = win32_get_window_size(window);
-        win32_display_backbuffer(g_backbuffer, hdc, 0, 0, window_size.width, window_size.height);
-        // TODO: See if I can/should use OWNDC and use the same DC without releasing
-        ReleaseDC(window, hdc);
-        LARGE_INTEGER current_measurement;
-        QueryPerformanceCounter(&current_measurement);
-        uint64 elapsed_time = (current_measurement.QuadPart - last_measurement.QuadPart);
-        //convert to us
-        elapsed_time *= 1000;
-        elapsed_time /= counter_frequency.QuadPart;
-        last_measurement = current_measurement;
-        printf("%lld ms, %lld fps\n", elapsed_time, 1000/(elapsed_time));
-    }
+
+    game_main();
 
     return 0;
 }

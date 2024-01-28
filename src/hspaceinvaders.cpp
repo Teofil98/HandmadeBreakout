@@ -39,6 +39,7 @@ void write_square_wave(platform_sound_buffer* buffer, const uint32 frequency, co
     }
 }
 
+// FIXME: Certain frequencies produce audible skip
 void write_sin_wave(platform_sound_buffer* buffer, const uint32 frequency, const int tone_volume)
 {
     // TODO: Consider if I want to have non 16b/sample  audio
@@ -60,9 +61,9 @@ void write_sin_wave(platform_sound_buffer* buffer, const uint32 frequency, const
     }
 }
 
-platform_window* g_window;
-platform_backbuffer* g_backbuffer;
-platform_sound_buffer* g_sound_buffer;
+static platform_window* g_window;
+static platform_backbuffer* g_backbuffer;
+static platform_sound_buffer* g_sound_buffer;
 void game_init(void)
 {
     g_window = open_window("Handmade Space Invader", DEFAULT_WINDOW_W, DEFAULT_WINDOW_H);
@@ -72,6 +73,13 @@ void game_init(void)
     const uint8 bits_per_sample = 16;
     init_sound(channels, nb_samples_per_sec, bits_per_sample);
     g_sound_buffer = create_sound_buffer();
+}
+
+void game_destroy(void)
+{
+    destroy_window(g_window); 
+    destroy_backbuffer(g_backbuffer);
+    destroy_sound_buffer(g_sound_buffer);
 }
 
 void fill_red(platform_backbuffer* backbuffer)
@@ -104,7 +112,7 @@ void game_main(void)
         elapsed_time *= 1000;
         elapsed_time /= timer_freq;
         last_measurement = current_measurement;
-
-        printf("%lld ms, %lld fps\n", elapsed_time, 1000/(elapsed_time));
+        //printf("%lld ms, %lld fps\n", elapsed_time, 1000/(elapsed_time));
     }
+    game_destroy();
 }

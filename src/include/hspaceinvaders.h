@@ -4,6 +4,7 @@
 
 void game_main(void);
 void game_init(void);
+void game_destroy(void);
 
 void draw_gradient(const platform_backbuffer* backbuffer, 
                    const uint32 row_offset, const uint32 col_offset);

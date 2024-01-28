@@ -29,6 +29,7 @@ struct win32_context {
 
 struct platform_window_context {
     HWND window_handle;
+    ATOM window_class;
 };
 
 struct platform_sound_buffer_context {
@@ -52,7 +53,6 @@ static win32_window_size win32_get_window_size(const HWND window)
     return size;
 }
 
-
 platform_backbuffer* create_backbuffer(const uint32 width, const uint32 height, const uint32 bytes_per_pixel)
 {
     platform_backbuffer* backbuffer = new platform_backbuffer;
@@ -75,12 +75,21 @@ platform_backbuffer* create_backbuffer(const uint32 width, const uint32 height, 
                     NULL, width * height * backbuffer->bytes_per_pixel, 
                     MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE
                 ); 
-    // TODO: Delete after testing
+    // Needed for WM_PAINT
     g_backbuffer = backbuffer;
     // TODO: Maybe clear this to black
     return backbuffer;
 }
 
+void destroy_backbuffer(platform_backbuffer* backbuffer)
+{
+    if(!VirtualFree(backbuffer->bitmap, 0, MEM_RELEASE)) {
+        // TODO: Log error
+        printf("Failed to free allocated backbuffer\n");
+    }
+    delete backbuffer->context;
+    delete backbuffer;
+}
 
 static void win32_display_backbuffer(const platform_backbuffer* backbuffer, 
                     const HDC device_context,
@@ -190,7 +199,8 @@ platform_window* open_window(const char* title, const uint32 width, const uint32
         .hInstance = g_context.program_instance,
         .lpszClassName = "HandmadeSpaceInvadersWindowClass"
     };
-    if(RegisterClassExA(&window_class) == 0) {
+    ATOM w_class_atom = RegisterClassExA(&window_class);
+    if(w_class_atom == 0) {
         // TODO: Log ERROR && Error handling
         printf("Error, could not register window class\n");
         //return -1; // TODO: Find actual code I want to return. 
@@ -234,10 +244,24 @@ platform_window* open_window(const char* title, const uint32 width, const uint32
     platform_window* plat_window = new platform_window; 
     plat_window->context = new platform_window_context;
     plat_window->context->window_handle = window;
+    plat_window->context->window_class = w_class_atom;
     //plat_window->width = width;
     //plat_window->height = height;
     return plat_window;
  }
+
+void destroy_window(platform_window* window) 
+{
+    // TODO: Could let windows clean this up
+    if(!DestroyWindow(window->context->window_handle)) {
+        // TODO: Log and error handling.
+        printf("Failed to destroy window\n");
+    }    
+    // TODO: Class automatically unregistered when program terminates
+    // See if I want to unregister manually
+    delete window->context;
+    delete window;
+}
 
 void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec, const uint8 bits_per_sample)
 {
@@ -284,6 +308,16 @@ platform_sound_buffer* create_sound_buffer(void)
     };
 
     return sound_buffer;
+}
+
+void destroy_sound_buffer(platform_sound_buffer* sound_buffer)
+{
+    if(!VirtualFree(sound_buffer->buffer, 0, MEM_RELEASE)) {
+        // TODO: Log error
+        printf("Could not free allocated sound buffer\n");
+    }         
+    delete sound_buffer->context;
+    delete sound_buffer;
 }
 
 void play_sound_buffer(platform_sound_buffer* sound_buffer)

@@ -82,24 +82,12 @@ void game_destroy(void)
     destroy_sound_buffer(g_sound_buffer);
 }
 
-void fill_red(platform_backbuffer* backbuffer)
-{
-    uint32* pixels = (uint32*)backbuffer->bitmap;
-    const uint32 nb_rows = backbuffer->height;
-    const uint32 nb_cols = backbuffer->width;
-    for(uint32 row = 0; row < nb_rows; row ++) {
-        for(uint32 col = 0; col < nb_cols; col ++) {
-            pixels[row * nb_cols + col] = RGBA(200, 1, 2, 0);
-        }
-    }
-}
-
 void game_main(void)
 {
     game_init();
     int32 xoffset = 0, yoffset = 0; // Used for gradient animation
-    play_sound_buffer(g_sound_buffer);    
     write_sin_wave(g_sound_buffer, 440, 1600);
+    play_sound_buffer(g_sound_buffer);
     uint64 last_measurement = get_timer();
     uint64 timer_freq = get_timer_frequency();
     while(!should_close()) {

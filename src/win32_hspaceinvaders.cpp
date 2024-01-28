@@ -377,7 +377,7 @@ void display_backbuffer(const platform_backbuffer* backbuffer, const platform_wi
         SRCCOPY
     );
     // TODO: See if I can/should use OWNDC and use the same DC without releasing
-      
+    ReleaseDC(window->context->window_handle, hdc); 
 }
 
 bool should_close() 

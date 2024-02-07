@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <X11/keysym.h>
 #include <X11/keysymdef.h>
+#include <X11/XKBlib.h>
 #include "include/defines.h"
 
 static Display* g_display_server;
@@ -47,21 +48,22 @@ int main()
     // TODO: XNextEvent is blocking :( Look into XCheckMaskEvent
     while( !exit && (XNextEvent(g_display_server, &event) == 0))  
     {
+		// TODO: Figure out what last 2 parameters do (group and level)
+		KeySym key = XkbKeycodeToKeysym(g_display_server, event.xkey.keycode, 0, 0);
         switch (event.type) {
             case KeyRelease: {
-                switch (event.xkey.keycode) {
-                    // TODO: I want to use keycodes but I don't want to call XKeysymToKeycode
-                    case 9: {
+                switch (key) {
+                    case XK_Escape: {
                         exit = true; 
                     } break; 
-                    case 25: {
+                    case XK_w: {
                         printf("W\n");
                     } break;
-                    case XK_S: {
+                    case XK_s: {
                         printf("S\n");
                     } break;
-                    default: printf("Event key type: %d\n", event.xkey.keycode);
-                    printf("Converted esc: %d\n", XKeysymToKeycode(g_display_server, XK_W));
+                    default: printf("Event key type: %lx\n", key); 
+                    //printf("Converted esc: %d\n", XKeysymToKeycode(g_display_server, XK_W));
                 }
             } break;
             default: printf("Event type: %d\n", event.xkey.type);

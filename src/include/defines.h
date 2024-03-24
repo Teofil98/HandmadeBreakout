@@ -16,6 +16,7 @@
 
 #define DEFAULT_WINDOW_W 1280 
 #define DEFAULT_WINDOW_H 720
+#define WINDOW_TITLE "Handmade Space Invaders"
 
 #define PI 3.14159265359
 

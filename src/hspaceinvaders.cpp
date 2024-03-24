@@ -66,7 +66,7 @@ static platform_backbuffer* g_backbuffer;
 static platform_sound_buffer* g_sound_buffer;
 void game_init(void)
 {
-    g_window = open_window("Handmade Space Invader", DEFAULT_WINDOW_W, DEFAULT_WINDOW_H);
+    g_window = open_window(WINDOW_TITLE, DEFAULT_WINDOW_W, DEFAULT_WINDOW_H);
     g_backbuffer = create_backbuffer(DEFAULT_WINDOW_W, DEFAULT_WINDOW_H, 4);
     const uint8 channels = 2;
     const uint32 nb_samples_per_sec = 44100;

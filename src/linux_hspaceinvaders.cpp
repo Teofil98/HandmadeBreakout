@@ -1,5 +1,7 @@
 #include <X11/X.h>
 #include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <X11/extensions/XKB.h>
 #include <stdio.h>
 #include <X11/keysym.h>
 #include <X11/keysymdef.h>
@@ -38,6 +40,17 @@ int main()
                     DefaultDepth(g_display_server, g_screen), InputOutput, DefaultVisual(g_display_server, g_screen),
                     CWBackPixel | CWBorderPixel | CWEventMask, &attributes);
 
+	XTextProperty window_title_propery;
+	// FIXME: Replace this ugly thing with the define called from main game loop
+	// For now leave it like this for testing.
+	char* window_title = (char*) "Handmade Space Invaders";
+	if(XStringListToTextProperty(&window_title, 1, &window_title_propery) == 0) {
+		// TODO: handle error
+		printf("Error creating window title property\n");
+	}
+	XSetWMName(g_display_server, window, &window_title_propery);
+	// TODO: See if I want a different name for icon title 
+	XSetWMIconName(g_display_server, window, &window_title_propery);
     // Make window visible
     XMapWindow(g_display_server, window);
 

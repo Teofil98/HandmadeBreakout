@@ -87,33 +87,36 @@ int main()
     // Make window visible
     XMapWindow(g_display_server, window);
 
-    XEvent event;
     // TODO: Don't want the loop to be here, but rather in game layer
     // This is just for testing
     bool exit = false;
-    // TODO: XNextEvent is blocking :( Look into XCheckMaskEvent
-    while( !exit && (XNextEvent(g_display_server, &event) == 0))  
+
+    while(!exit)  
     {
-		// TODO: Figure out what last 2 parameters do (group and level)
-		KeySym key = XkbKeycodeToKeysym(g_display_server, event.xkey.keycode, 0, 0);
-        switch (event.type) {
-            case KeyRelease: {
-                switch (key) {
-                    case XK_Escape: {
-                        exit = true; 
-                    } break; 
-                    case XK_w: {
-                        printf("W\n");
-                    } break;
-                    case XK_s: {
-                        printf("S\n");
-                    } break;
-                    default: printf("Event key type: %lx\n", key); 
-                    //printf("Converted esc: %d\n", XKeysymToKeycode(g_display_server, XK_W));
-                }
-            } break;
-            default: printf("Event type: %d\n", event.xkey.type);
-        }
+		XEvent event;
+		// TODO: Figure out what KeymapStateMask does and if I need it in addition to KeyReleaseMask
+		long event_mask =  KeyReleaseMask;
+		if(XCheckMaskEvent(g_display_server, event_mask, &event)) {
+			// TODO: Figure out what last 2 parameters do (group and level)
+			KeySym key = XkbKeycodeToKeysym(g_display_server, event.xkey.keycode, 0, 0);
+    	    switch (event.type) {
+    	        case KeyRelease: {
+    	            switch (key) {
+    	                case XK_Escape: {
+    	                    exit = true; 
+    	                } break; 
+    	                case XK_w: {
+    	                    printf("W\n");
+    	                } break;
+    	                case XK_s: {
+    	                    printf("S\n");
+    	                } break;
+    	                default: printf("Event key type: %lx\n", key); 
+    	            }
+    	        } break;
+    	        default: printf("Event type: %d\n", event.xkey.type);
+    	    }
+		}
 
 		XPutImage(g_display_server, window, gc, image, 
 				0, 0, 0, 0,

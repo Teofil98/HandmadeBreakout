@@ -241,6 +241,7 @@ platform_window* open_window(const char* title, const uint32 width, const uint32
     }
 
 
+	//TODO: Set title
     platform_window* plat_window = new platform_window; 
     plat_window->context = new platform_window_context;
     plat_window->context->window_handle = window;

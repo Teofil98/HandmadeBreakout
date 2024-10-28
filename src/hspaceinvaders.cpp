@@ -32,10 +32,10 @@ void write_square_wave(platform_sound_buffer* buffer, const uint32 frequency, co
 
     for(int i = 0; i < nb_samples; i += 2)
     {
-        int sign = (i / half_period) % 2 == 0 ? 1 : -1;
-        // set left and right samples
-        audio_buffer[i] = sign * tone_volume;
-       audio_buffer[i + 1] = sign * tone_volume;
+		int sign = (i / half_period) % 2 == 0 ? 1 : -1;
+		// set left and right samples
+		audio_buffer[i] = sign * tone_volume;
+		audio_buffer[i + 1] = sign * tone_volume;
     }
 }
 
@@ -71,35 +71,35 @@ void game_init(void)
     const uint8 channels = 2;
     const uint32 nb_samples_per_sec = 44100;
     const uint8 bits_per_sample = 16;
-    init_sound(channels, nb_samples_per_sec, bits_per_sample);
-    g_sound_buffer = create_sound_buffer();
+    //init_sound(channels, nb_samples_per_sec, bits_per_sample);
+    //g_sound_buffer = create_sound_buffer();
 }
 
 void game_destroy(void)
 {
     destroy_window(g_window); 
     destroy_backbuffer(g_backbuffer);
-    destroy_sound_buffer(g_sound_buffer);
+    //destroy_sound_buffer(g_sound_buffer);
 }
 
 void game_main(void)
 {
     game_init();
     int32 xoffset = 0, yoffset = 0; // Used for gradient animation
-    write_sin_wave(g_sound_buffer, 440, 1600);
-    play_sound_buffer(g_sound_buffer);
-    uint64 last_measurement = get_timer();
-    uint64 timer_freq = get_timer_frequency();
+    //write_sin_wave(g_sound_buffer, 440, 1600);
+    //play_sound_buffer(g_sound_buffer);
+    //uint64 last_measurement = get_timer();
+    //uint64 timer_freq = get_timer_frequency();
     while(!should_close()) {
         poll_platform_messages();
         draw_gradient(g_backbuffer, xoffset, yoffset++);
         display_backbuffer(g_backbuffer, g_window);
-        uint64 current_measurement = get_timer();
-        uint64 elapsed_time = current_measurement - last_measurement;
+      //  uint64 current_measurement = get_timer();
+      //  uint64 elapsed_time = current_measurement - last_measurement;
         //convert to ms
-        elapsed_time *= 1000;
-        elapsed_time /= timer_freq;
-        last_measurement = current_measurement;
+       // elapsed_time *= 1000;
+       // elapsed_time /= timer_freq;
+       // last_measurement = current_measurement;
         //printf("%lld ms, %lld fps\n", elapsed_time, 1000/(elapsed_time));
     }
     game_destroy();

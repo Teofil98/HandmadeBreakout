@@ -1,0 +1,15 @@
+---
+Checks: > 
+  -*,
+  bugprone-*,
+  concurrency-*,
+  linuxkernel-*,
+  misc-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -misc-use-anonymous-namespace,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -readability-identifier-length
+-bugprone-implicit-widening-of-multiplication-result,

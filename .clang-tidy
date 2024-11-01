@@ -11,5 +11,5 @@ Checks: >
   -misc-use-anonymous-namespace,
   -bugprone-easily-swappable-parameters,
   -bugprone-narrowing-conversions,
-  -readability-identifier-length
--bugprone-implicit-widening-of-multiplication-result,
+  -readability-identifier-length,
+  -bugprone-implicit-widening-of-multiplication-result,

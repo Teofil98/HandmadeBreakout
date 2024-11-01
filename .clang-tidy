@@ -8,6 +8,7 @@ Checks: >
   performance-*,
   portability-*,
   readability-*,
+  altera-struct-pack-align,
   -misc-use-anonymous-namespace,
   -bugprone-easily-swappable-parameters,
   -bugprone-narrowing-conversions,

@@ -281,6 +281,9 @@ void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec, const
     win32_xaudio2_init(&g_context.wave_format);
 }
 
+// FIXME: Implement teardown_sound
+
+// FIXME: Change signature to include size of buffer 
 platform_sound_buffer* create_sound_buffer(void)
 {
     platform_sound_buffer* sound_buffer = new platform_sound_buffer;

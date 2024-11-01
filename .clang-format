@@ -65,13 +65,13 @@ BraceWrapping:
   AfterCaseLabel:  false
   AfterClass:      true
   AfterControlStatement: Never
-  AfterEnum:       true
+  AfterEnum:       false
   AfterExternBlock: true
   AfterFunction:   true
   AfterNamespace:  true
   AfterObjCDeclaration: true
-  AfterStruct:     true
-  AfterUnion:      true
+  AfterStruct:     false
+  AfterUnion:      false
   BeforeCatch:     true
   BeforeElse:      false
   BeforeLambdaBody: false

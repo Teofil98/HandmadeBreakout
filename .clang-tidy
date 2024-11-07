@@ -2,7 +2,7 @@
 Checks: > 
   -*,
   bugprone-*,
-  concurrency-*,
+  -concurrency-*, #reactivate once I do threating
   linuxkernel-*,
   misc-*,
   performance-*,
@@ -14,3 +14,6 @@ Checks: >
   -bugprone-narrowing-conversions,
   -readability-identifier-length,
   -bugprone-implicit-widening-of-multiplication-result,
+  -readability-magic-numbers,
+  -readability-uppercase-literal-suffix,
+  -readability-redundant-casting,

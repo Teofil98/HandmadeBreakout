@@ -52,7 +52,7 @@ void write_sin_wave(platform_sound_buffer* buffer, const uint32 frequency,
     int32 nb_samples = (int32)buffer->size_bytes / 2;
     // TODO:  For now, I assume that the buffer lasts for 1 second
     // FIXME: Deal with buffers that have length more than 1 sec
-    const uint32 wave_period = nb_samples / frequency;
+    const uint32 wave_period = buffer->nb_samples_per_sec / frequency;
 
     for(int i = 0; i < nb_samples; i += 2) {
         // Where in the sin wave we are, in radians
@@ -69,6 +69,12 @@ static platform_window* g_window;
 static platform_backbuffer* g_backbuffer;
 static platform_sound_buffer* g_sound_buffer;
 
+static inline uint32 get_frames_from_time_sec(float32 time,
+                                              uint32 samples_per_second)
+{
+    return time * samples_per_second;
+}
+
 void game_init(void)
 {
     g_window = open_window(WINDOW_TITLE, DEFAULT_WINDOW_W, DEFAULT_WINDOW_H);
@@ -77,7 +83,8 @@ void game_init(void)
     const uint32 nb_samples_per_sec = 44100;
     const uint8 bits_per_sample = 16;
     init_sound(channels, nb_samples_per_sec, bits_per_sample);
-    g_sound_buffer = create_sound_buffer();
+    g_sound_buffer = create_sound_buffer(
+        get_frames_from_time_sec(2.0f, nb_samples_per_sec));
 }
 
 void game_destroy(void)
@@ -94,8 +101,6 @@ void game_main(void)
     int32 xoffset = 0;
     int32 yoffset = 0;
     write_sin_wave(g_sound_buffer, 300, 1600);
-    // FIXME: Sound buffer limited in size. Need to implement piece-wise buffer
-    // playing.
     play_sound_buffer(g_sound_buffer);
     // uint64 last_measurement = get_timer();
     // uint64 timer_freq = get_timer_frequency();

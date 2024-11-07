@@ -38,10 +38,10 @@ struct platform_backbuffer_context {
 struct linux_context {
     snd_pcm_hw_params_t* snd_hw_params;
     snd_pcm_t* pcm_device_handle;
+    uint32 max_hw_frames;
 };
 
 struct platform_sound_buffer_context {
-    snd_pcm_uframes_t nb_frames;
 };
 
 static linux_context g_linux_context;
@@ -135,8 +135,6 @@ platform_backbuffer* create_backbuffer(const uint32 width, const uint32 height,
     plat_backbuffer->bytes_per_pixel = bytes_per_pixel;
     plat_backbuffer->bitmap = (void*)backbuffer;
     plat_backbuffer->context->image = image;
-    //	printf("Bitmap unit: %d\nBits per pixel: %d\n\n", image->bitmap_unit,
-    //image->bits_per_pixel); 	printf("Direct Color: %d\n", DirectColor);
 
     return plat_backbuffer;
 }
@@ -202,7 +200,7 @@ void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
     // them back in.
     // TODO: Opened just for playback now, maybe I want to implement recording
     // at some point as well?
-    ret = snd_pcm_open(&g_linux_context.pcm_device_handle, "default",
+    ret = snd_pcm_open(&g_linux_context.pcm_device_handle, "plughw:0,0",
                        SND_PCM_STREAM_PLAYBACK, 0);
     if(ret < 0) {
         printf("Error: unable to open pcm device: %s\n", snd_strerror(ret));
@@ -277,6 +275,9 @@ void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
         exit(1);
     }
 
+    // FIXME: Probably want max frames instead now that piecewise playing is
+    // implemented.
+    //
     // Set period size to 1 second
     snd_pcm_uframes_t frames = nb_samples_per_sec / nb_channels;
     ret = snd_pcm_hw_params_set_period_size_near(
@@ -294,6 +295,13 @@ void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
                                           &max_period_us, &dir);
     printf("Max period size: %f ms\n", max_period_us / 1000.0f);
 
+    // TODO: Log trace
+    snd_pcm_uframes_t max_frames;
+    snd_pcm_hw_params_get_buffer_size_max(g_linux_context.snd_hw_params,
+                                          &max_frames);
+    printf("Maximum  number of frames: %ld\n", max_frames);
+    g_linux_context.max_hw_frames = max_frames;
+
     // Write the parameters to the driver
     ret = snd_pcm_hw_params(g_linux_context.pcm_device_handle,
                             g_linux_context.snd_hw_params);
@@ -309,16 +317,14 @@ void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
         printf("Alsa: PCM device not in prepared state after initalization\n");
     }
 
-    // NOTE: This should be called automatically by snd_pcm_hw_params()
+    // NOTE: This is called automatically by snd_pcm_hw_params()
     // snd_pcm_prepare(g_linux_context.pcm_device_handle);
 }
 
-// FIXME: Change function signature to get size as an argument?
-// For now I assume buffer lasts for 1 second
-platform_sound_buffer* create_sound_buffer(void)
+platform_sound_buffer* create_sound_buffer(uint32 size_frames)
 {
     // TODO: Log infos here
-    int ret;
+    int32 ret;
     platform_sound_buffer* sound_buffer = new platform_sound_buffer;
     sound_buffer->context = new platform_sound_buffer_context;
 
@@ -347,23 +353,14 @@ platform_sound_buffer* create_sound_buffer(void)
         printf("Sound subsystem: Unknown format\n");
         exit(1);
     }
-
-    /* Use a buffer large enough to hold one period */
-    snd_pcm_uframes_t frames;
-    ret = snd_pcm_hw_params_get_period_size(g_linux_context.snd_hw_params,
-                                            &frames, &dir);
-    if(ret < 0) {
-        // TODO: Log error
-        printf("Alsa: Error getting period size: %s\n", snd_strerror(ret));
-        exit(1);
-    }
-
-    uint32 size = frames * 4; /* 2 bytes/sample, 2 channels */
+    uint32 size = size_frames * 4; /* 2 bytes/sample, 2 channels */
     sound_buffer->buffer = (void*)malloc(size * sizeof(uint8));
     sound_buffer->size_bytes = size;
-    sound_buffer->context->nb_frames = frames;
+    sound_buffer->size_frames = size_frames;
 
-    uint32 val;
+    // FIXME: See why getting period time sometimes fails (program still seems
+    // to work)
+    /*uint32 val;
     ret = snd_pcm_hw_params_get_period_time(g_linux_context.snd_hw_params, &val,
                                             &dir);
     if(ret < 0) {
@@ -373,7 +370,7 @@ platform_sound_buffer* create_sound_buffer(void)
     }
     // TODO: Log trace
     printf("Sound subsystem: Period of buffer: %f ms\n", val / 1000.0f);
-
+*/
     uint32 channels;
     ret = snd_pcm_hw_params_get_channels(g_linux_context.snd_hw_params,
                                          &channels);
@@ -389,29 +386,43 @@ void destroy_sound_buffer(platform_sound_buffer* sound_buffer)
     delete sound_buffer;
 }
 
+// FIXME: The while loop causes delay for displaying graphics
+// Maybe want to have this as a separate thread
 void play_sound_buffer(platform_sound_buffer* sound_buffer)
 {
-    int32 ret;
-    ret = snd_pcm_writei(g_linux_context.pcm_device_handle,
-                         sound_buffer->buffer,
-                         sound_buffer->context->nb_frames);
-    if(ret == -EPIPE) {
-        // EPIPE means underrun
-        // TODO: Log and see what I want to do here
-        printf("Alsa: Underrun occurred\n");
-    } else if(ret < 0) {
-        // TODO: Log error
-        printf("Alsa: Error from writei: %s\n", snd_strerror(ret));
-        exit(1);
-    } else if(ret != (int32)sound_buffer->context->nb_frames) {
-        // TODO: Log error/trace
-        printf("Alsa: Short write, wrote %d frames\n", ret);
+    uint32 played_frames = 0;
+
+    while(played_frames < sound_buffer->size_frames) {
+        uint32 frames_to_play = (sound_buffer->size_frames - played_frames)
+                                        < g_linux_context.max_hw_frames
+                                    ? (sound_buffer->size_frames
+                                       - played_frames)
+                                    : g_linux_context.max_hw_frames;
+        int32 ret;
+        ret = snd_pcm_writei(g_linux_context.pcm_device_handle,
+                             sound_buffer->buffer, frames_to_play);
+        if(ret == -EPIPE) {
+            // EPIPE means underrun
+            // TODO: Log and see what I want to do here
+            printf("Alsa: Underrun occurred\n");
+        } else if(ret < 0) {
+            // TODO: Log error
+            printf("Alsa: Error from writei: %s\n", snd_strerror(ret));
+            exit(1);
+        } else if(ret != (int32)frames_to_play) {
+            // TODO: Log error/trace
+            printf("Alsa: Short write, wrote %d frames\n", ret);
+        }
+
+        // FIXME: Probably want to exit on underrun or make sure that I don't
+        // add it here
+        played_frames += ret;
     }
 }
 
 void teardown_sound()
 {
-	// TODO: Maybe I don't need drain
+    // TODO: Maybe I don't need drain
     snd_pcm_drain(g_linux_context.pcm_device_handle);
     snd_pcm_close(g_linux_context.pcm_device_handle);
 }
@@ -419,7 +430,7 @@ void teardown_sound()
 // uint64 get_timer(void);
 // uint64 get_timer_frequency(void);
 
-void test_sound()
+static void test_sound()
 {
     long loops;
     int rc;

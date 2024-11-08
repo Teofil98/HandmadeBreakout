@@ -7,6 +7,7 @@
 #include "include/defines.h"
 #include "include/hspaceinvaders.h"
 #include "include/platform_layer.h"
+#include "include/logging.h"
 #include <X11/XKBlib.h>
 #include <alsa/asoundlib.h>
 #include <stdio.h>
@@ -522,6 +523,9 @@ static void test_sound()
 
 int main()
 {
+	int n = 3;
+	int p = 2;
+	LOG_ERROR("N is %d and P is %d\n", n, p);
     // test_sound();
     // TODO: Maybe use this to identify the sound device to use?
 

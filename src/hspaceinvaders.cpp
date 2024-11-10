@@ -51,8 +51,6 @@ void write_sin_wave(platform_sound_buffer* buffer, const uint32 frequency,
     // TODO: xaudio2_buffer->NbBytes should be multiple of 2, maybe assert
     uint16* audio_buffer = (uint16*)buffer->buffer;
     int32 nb_samples = (int32)buffer->size_bytes / 2;
-    // TODO:  For now, I assume that the buffer lasts for 1 second
-    // FIXME: Deal with buffers that have length more than 1 sec
     const uint32 wave_period = buffer->nb_samples_per_sec / frequency;
 
     for(int i = 0; i < nb_samples; i += 2) {

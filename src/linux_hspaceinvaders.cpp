@@ -266,8 +266,9 @@ void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
     snd_pcm_hw_params_get_buffer_size_max(g_linux_context.snd_hw_params,
             &max_frames);
     LOG_TRACE("Maximum  number of frames: %ld\n", max_frames);
-    // FIXME: This affects the sound frequency .... again
-    max_frames = 2000;
+    // TODO: Figure out what buffer size I want to use
+    const uint32 period_size = 1000;
+    max_frames = max_frames < period_size ? max_frames : period_size;
     g_linux_context.max_hw_frames = max_frames;
     ret = snd_pcm_hw_params_set_period_size_near(
             g_linux_context.pcm_device_handle, g_linux_context.snd_hw_params,
@@ -382,6 +383,7 @@ void destroy_sound_buffer(platform_sound_buffer* sound_buffer)
 void play_sound_buffer(platform_sound_buffer* sound_buffer)
 {
     uint32 played_frames = 0;
+    void* buffer = sound_buffer->buffer;
 
     while(played_frames < sound_buffer->size_frames) {
         uint32 frames_to_play = (sound_buffer->size_frames - played_frames)
@@ -390,8 +392,12 @@ void play_sound_buffer(platform_sound_buffer* sound_buffer)
                                        - played_frames)
                                     : g_linux_context.max_hw_frames;
         int32 ret;
+        frames_to_play = frames_to_play < 400 ? frames_to_play : 400;
         ret = snd_pcm_writei(g_linux_context.pcm_device_handle,
-                             sound_buffer->buffer, frames_to_play);
+                             buffer, frames_to_play);
+        // Move forward in the buffer by the number of frames
+        // 1 frame = 2 samples, 1 sample = 2 bytes
+        buffer = (void*)((char*)buffer + frames_to_play * 4);
         if(ret == -EPIPE) {
             // EPIPE means underrun
             // TODO: Log and see what I want to do here

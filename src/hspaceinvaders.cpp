@@ -1,5 +1,6 @@
 #include "include/hspaceinvaders.h"
 #include "include/defines.h"
+#include "include/logging.h"
 #include "include/platform_layer.h"
 #include <math.h>  // TODO: replace functions here with own implementation
 #include <stdio.h> // TODO: Delete once testing done
@@ -72,26 +73,31 @@ static platform_sound_buffer* g_sound_buffer;
 static inline uint32 get_frames_from_time_sec(float32 time,
                                               uint32 samples_per_second)
 {
-    return time * samples_per_second;
+    return (uint32)(time * samples_per_second);
 }
 
 void game_init(void)
 {
+    LOG_TRACE("Game init\n");
     g_window = open_window(WINDOW_TITLE, DEFAULT_WINDOW_W, DEFAULT_WINDOW_H);
     g_backbuffer = create_backbuffer(DEFAULT_WINDOW_W, DEFAULT_WINDOW_H, 4);
     const uint8 channels = 2;
     const uint32 nb_samples_per_sec = 44100;
     const uint8 bits_per_sample = 16;
     init_sound(channels, nb_samples_per_sec, bits_per_sample);
+    // FIXME: No output for 1 second
     g_sound_buffer = create_sound_buffer(
-        get_frames_from_time_sec(2.0f, nb_samples_per_sec));
+        get_frames_from_time_sec(1.0f, nb_samples_per_sec));
+    LOG_TRACE("Game init done\n");
 }
 
 void game_destroy(void)
 {
+    LOG_TRACE("Destroying game\n");
     destroy_window(g_window);
     destroy_backbuffer(g_backbuffer);
     destroy_sound_buffer(g_sound_buffer);
+    LOG_TRACE("Destroyed game\n");
 }
 
 void game_main(void)

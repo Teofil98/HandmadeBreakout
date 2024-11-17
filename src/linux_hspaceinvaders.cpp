@@ -208,7 +208,7 @@ void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
     }
 
     // Allocate a hardware parameters object
-    snd_pcm_hw_params_alloca(&g_linux_context.snd_hw_params);
+    snd_pcm_hw_params_malloc(&g_linux_context.snd_hw_params);
     if(g_linux_context.snd_hw_params == NULL) {
         LOG_ERROR("Alsa: Could not allocate sound params\n");
     }
@@ -322,6 +322,7 @@ void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
 
 platform_sound_buffer* create_sound_buffer(uint32 size_frames)
 {
+    LOG_TRACE("Creating sound buffer.\n");
     int32 dir;
     int32 ret;
     platform_sound_buffer* sound_buffer = new platform_sound_buffer;

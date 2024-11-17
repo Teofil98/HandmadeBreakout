@@ -2,11 +2,103 @@
 #include "include/defines.h"
 #include "include/logging.h"
 #include "include/platform_layer.h"
-#include <math.h>  // TODO: replace functions here with own implementation
-#include <stdio.h> // TODO: Delete once testing done
+#include <math.h> // TODO: replace functions here with own implementation
 
 // GENERAL TODO: Check all return values of all functions and log errors where
 // needed. I Probably missed a few places so far in ALL SOURCE FILES SO FAR :)
+
+struct screen_information {
+
+    screen_information(uint32 wip, uint32 hip, uint32 ps)
+        : width_in_pixels { wip }, height_in_pixels { hip }, pixel_size { ps }
+    {
+        screen_width = wip * ps;
+        screen_height = hip * ps;
+    };
+
+    uint32 width_in_pixels;
+    uint32 height_in_pixels;
+    uint32 pixel_size;
+    uint32 screen_width;
+    uint32 screen_height;
+};
+
+struct sprite {
+
+    sprite(const uint8 w, const uint8 h, const uint8* bytes, uint32 color)
+        : width { w }, height { h }, bytes { bytes }, color { color },
+          row { 0 }, col { 0 } {};
+
+    const uint32 width;
+    const uint32 height;
+    const uint8* bytes;
+    uint32 color;
+    // Current position of sprite
+    uint32 row;
+    uint32 col;
+};
+
+static screen_information* g_screen_info;
+
+static const uint8_t spaceship_bytes[] = {
+    "-----*-----"
+    "----***----"
+    "--*-*-*-*--"
+    "-**-*-*-**-"
+    "***********"
+    "***********"
+    "-**-***-**-"
+    "--*--*--*--"
+};
+static sprite spaceship(11, 8, spaceship_bytes, RGBA(255, 255, 255, 0));
+
+static const uint8_t alien_bytes[] = {
+    "--*----*--"
+    "---*--*---"
+    "--******--"
+    "-**-**-**-"
+    "**********"
+    "-********-"
+    "--**--**--"
+    "--*----*--"
+};
+static sprite alien(10, 8, alien_bytes, RGBA(255, 255, 255, 0));
+
+static void draw_pixel(platform_backbuffer* backbuffer, const uint32 row,
+                       const uint32 col, const uint32 color)
+{
+    ASSERT(row < g_screen_info->height_in_pixels,
+           "Attempting to draw pixel on row %d with a screen height of %d\n",
+           row, g_screen_info->height_in_pixels);
+    ASSERT(col < g_screen_info->width_in_pixels,
+           "Attempting to draw pixel on col %d with a screen width of %d\n",
+           col, g_screen_info->width_in_pixels);
+
+    uint32_t* pixels = (uint32_t*)backbuffer->bitmap;
+    const uint32 nb_cols = backbuffer->width;
+
+    const uint32_t screen_row = row * g_screen_info->pixel_size;
+    const uint32_t screen_col = col * g_screen_info->pixel_size;
+
+    for(uint32 i = screen_row; i < screen_row + g_screen_info->pixel_size;
+        i++) {
+        for(uint32 j = screen_col; j < screen_col + g_screen_info->pixel_size;
+            j++) {
+            pixels[i * nb_cols + j] = color;
+        }
+    }
+}
+
+static void draw_sprite(sprite sprt, platform_backbuffer* backbuffer)
+{
+    for(uint32 i = 0; i < sprt.height; i++) {
+        for(uint32 j = 0; j < sprt.width; j++) {
+            if(sprt.bytes[sprt.width * i + j] == '*') {
+                draw_pixel(backbuffer, sprt.row + i, sprt.col + j, sprt.color);
+            }
+        }
+    }
+}
 
 void draw_gradient(const platform_backbuffer* backbuffer,
                    const uint32 row_offset, const uint32 col_offset)
@@ -68,17 +160,25 @@ static platform_window* g_window;
 static platform_backbuffer* g_backbuffer;
 static platform_sound_buffer* g_sound_buffer;
 
-static inline uint32 get_frames_from_time_sec(float32 time,
-                                              uint32 samples_per_second)
+static uint32 get_frames_from_time_sec(float32 time, uint32 samples_per_second)
 {
     return (uint32)(time * samples_per_second);
 }
 
-void game_init(void)
+void game_init(uint32 width_in_pixels, uint32 height_in_pixels,
+               uint32 pixel_size)
 {
     LOG_TRACE("Game init\n");
-    g_window = open_window(WINDOW_TITLE, DEFAULT_WINDOW_W, DEFAULT_WINDOW_H);
-    g_backbuffer = create_backbuffer(DEFAULT_WINDOW_W, DEFAULT_WINDOW_H, 4);
+
+    uint32_t bytes_per_pixel = 4;
+
+    g_screen_info = new screen_information(width_in_pixels, height_in_pixels,
+                                           pixel_size);
+    g_window = open_window(WINDOW_TITLE, g_screen_info->screen_width,
+                           g_screen_info->screen_height);
+    g_backbuffer = create_backbuffer(g_screen_info->screen_width,
+                                     g_screen_info->screen_height,
+                                     bytes_per_pixel);
     const uint8 channels = 2;
     const uint32 nb_samples_per_sec = 44100;
     const uint8 bits_per_sample = 16;
@@ -95,12 +195,13 @@ void game_destroy(void)
     destroy_window(g_window);
     destroy_backbuffer(g_backbuffer);
     destroy_sound_buffer(g_sound_buffer);
+    delete g_screen_info;
     LOG_TRACE("Destroyed game\n");
 }
 
 void game_main(void)
 {
-    game_init();
+    game_init(128, 128, 8);
     // Used for gradient animation
     int32 xoffset = 0;
     int32 yoffset = 0;
@@ -110,7 +211,13 @@ void game_main(void)
     // uint64 timer_freq = get_timer_frequency();
     while(!should_close()) {
         poll_platform_messages();
-        draw_gradient(g_backbuffer, xoffset, yoffset++);
+        spaceship.row = 64;
+        spaceship.col = 64;
+        alien.row = 32;
+        alien.col = 64;
+        draw_sprite(spaceship, g_backbuffer);
+        draw_sprite(alien, g_backbuffer);
+        // draw_gradient(g_backbuffer, xoffset, yoffset++);
         display_backbuffer(g_backbuffer, g_window);
         // FIXME: Implement get_time_ms instead of the timer shenannigans
 

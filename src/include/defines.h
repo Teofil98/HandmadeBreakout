@@ -14,7 +14,7 @@
 #define RGBA_BLUE(x) ((uint8_t)x << 0)
 #define RGBA(r, g, b, a) (RGBA_RED(r) | RGBA_GREEN(g) | RGBA_BLUE(b) | RGBA_ALPHA(a))
 
-#define DEFAULT_WINDOW_W 1280 
+#define DEFAULT_WINDOW_W 1280
 #define DEFAULT_WINDOW_H 720
 #define WINDOW_TITLE "Handmade Space Invaders"
 

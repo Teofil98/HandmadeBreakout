@@ -123,7 +123,7 @@ platform_backbuffer* create_backbuffer(const uint32 width, const uint32 height,
     XImage* image = XCreateImage(
         g_display_server, DefaultVisual(g_display_server, g_screen),
         DefaultDepth(g_display_server, g_screen), ZPixmap, 0, backbuffer,
-        DEFAULT_WINDOW_W, DEFAULT_WINDOW_H,
+        width, height,
         32, // TODO: probably want to change this bitmap_pad to 32 once I get
             // the depth sorted out
         0);
@@ -402,6 +402,7 @@ void play_sound_buffer(platform_sound_buffer* sound_buffer)
             // EPIPE means underrun
             // TODO: Log and see what I want to do here
             LOG_WARNING("Alsa: Underrun occurred\n");
+            //FIXME: Do a prepare after an underrun?
         } else if(ret < 0) {
             LOG_ERROR("Alsa: Error from writei: %s\n", snd_strerror(ret));
         } else if(ret != (int32)frames_to_play) {

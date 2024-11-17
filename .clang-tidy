@@ -18,3 +18,4 @@ Checks: >
   -readability-uppercase-literal-suffix,
   -readability-redundant-casting,
   -readability-math-missing-parentheses,
+  -misc-non-private-member-variables-in-classes,

@@ -76,23 +76,26 @@ platform_window* open_window(const char* title, const uint32 width,
     GC gc = XCreateGC(g_display_server, window, 0, NULL);
 
     XTextProperty window_title_propery;
-    char* title_cpy = (char*)malloc(strlen(title));
-    strcpy(title_cpy, title);
+    uint32 title_size = strlen(title);
+    char* title_cpy = (char*)malloc(sizeof(int8) * (title_size + 1));
+    strncpy(title_cpy, title, title_size);
+    title_cpy[title_size] = '\0';
     if(XStringListToTextProperty(&title_cpy, 1, &window_title_propery) == 0) {
         LOG_ERROR("Error creating window title property\n");
     }
     XSetWMName(g_display_server, window, &window_title_propery);
     // TODO: See if I want a different name for icon title
     XSetWMIconName(g_display_server, window, &window_title_propery);
-    // Make window visible
+    // Make window visible*/
+    XFree(window_title_propery.value);
     XMapWindow(g_display_server, window);
 
     platform_window* plat_window = new platform_window;
     plat_window->context = new platform_window_context;
-    plat_window->title = (char*)malloc(strlen(title));
-    strcpy(plat_window->title, title);
+    plat_window->title = title_cpy;
     plat_window->context->gc = gc;
     plat_window->context->window = window;
+
 
     return plat_window;
 }

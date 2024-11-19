@@ -47,8 +47,6 @@ void destroy_sound_buffer(platform_sound_buffer* sound_buffer);
 void play_sound_buffer(platform_sound_buffer* sound_buffer);
 void teardown_sound();
 
-// TODO: Replace with get_time_ms(void)
-uint64 get_timer(void);
-uint64 get_timer_frequency(void);
+float64 get_time_ms(void);
 
 void poll_platform_messages(void);

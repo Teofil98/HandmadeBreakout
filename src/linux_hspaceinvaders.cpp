@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h> //TODO: Delete later
+#include <sys/time.h>
 
 static Display* g_display_server;
 static uint64 g_screen;
@@ -529,6 +530,16 @@ static void test_sound()
     free(buffer);
 
     exit(0);
+}
+
+float64 get_time_ms(void)
+{
+    struct timeval te;
+    // get current time
+    gettimeofday(&te, NULL);
+    // convert time to milliseconds
+    float64 milliseconds = te.tv_sec * 1000 + te.tv_usec / 1000.0;
+    return milliseconds;
 }
 
 int main()

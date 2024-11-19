@@ -207,8 +207,7 @@ void game_main(void)
     int32 yoffset = 0;
     write_sin_wave(g_sound_buffer, 300, 1600);
     play_sound_buffer(g_sound_buffer);
-    // uint64 last_measurement = get_timer();
-    // uint64 timer_freq = get_timer_frequency();
+    float64 last_measurement = get_time_ms();
     while(!should_close()) {
         poll_platform_messages();
         spaceship.row = 64;
@@ -221,13 +220,11 @@ void game_main(void)
         display_backbuffer(g_backbuffer, g_window);
         // FIXME: Implement get_time_ms instead of the timer shenannigans
 
-        //  uint64 current_measurement = get_timer();
-        //  uint64 elapsed_time = current_measurement - last_measurement;
+        float64 current_measurement = get_time_ms();
+        float64 elapsed_time = current_measurement - last_measurement;
         // convert to ms
-        // elapsed_time *= 1000;
-        // elapsed_time /= timer_freq;
-        // last_measurement = current_measurement;
-        // printf("%lld ms, %lld fps\n", elapsed_time, 1000/(elapsed_time));
+        last_measurement = current_measurement;
+        printf("%f ms, %f fps\n", elapsed_time, 1000.0/(elapsed_time));
     }
     game_destroy();
 }

@@ -1,13 +1,10 @@
-// #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
-// #include <X11/extensions/XKB.h>
-// #include <X11/keysym.h>
-// #include <X11/keysymdef.h>
 #include "include/defines.h"
 #include "include/hspaceinvaders.h"
 #include "include/logging.h"
 #include "include/platform_layer.h"
+#include "include/input.h"
 #include <X11/XKBlib.h>
 #include <alsa/asoundlib.h>
 #include <stdio.h>
@@ -18,7 +15,6 @@
 static Display* g_display_server;
 static uint64 g_screen;
 static Window g_root_window;
-static bool g_exit = false;
 
 // initial window position
 // TODO: See if I want to add something like this in windows
@@ -48,6 +44,9 @@ struct platform_sound_buffer_context {
 
 static linux_context g_linux_context;
 
+// define extern variable from input.h
+key_state keys[NUM_KEYS];
+
 platform_window* open_window(const char* title, const uint32 width,
                              const uint32 height)
 {
@@ -63,7 +62,7 @@ platform_window* open_window(const char* title, const uint32 width,
     XSetWindowAttributes attributes;
     attributes.background_pixel = WhitePixel(g_display_server, g_screen);
     attributes.border_pixel = BlackPixel(g_display_server, g_screen);
-    attributes.event_mask = KeyReleaseMask;
+    attributes.event_mask = KeyReleaseMask | KeyPressMask;
 
     // TODO: Change from DefaultDepth to something which includes the alpha
     // channel as well
@@ -108,8 +107,6 @@ void destroy_window(platform_window* window)
     XDestroyWindow(g_display_server, window->context->window);
     XCloseDisplay(g_display_server);
 }
-
-bool should_close(void) { return g_exit; }
 
 platform_backbuffer* create_backbuffer(const uint32 width, const uint32 height,
                                        const uint32 bytes_per_pixel)
@@ -160,34 +157,96 @@ void display_backbuffer(const platform_backbuffer* backbuffer,
               backbuffer->height);
 }
 
+static void press_key(KeySym key)
+{
+    LOG_TRACE("Handling key press event\n");
+    key_id k_id;
+    switch(key) {
+        case XK_Escape: {
+            k_id = KEY_ESC;
+        } break;
+        case XK_space: {
+            k_id = KEY_SPACE;
+        } break;
+        case XK_w: {
+            k_id = KEY_W;
+        } break;
+        case XK_a: {
+            k_id = KEY_A;
+        } break;
+        case XK_s: {
+            k_id = KEY_S;
+        } break;
+        case XK_d: {
+            k_id = KEY_D;
+        } break;
+        default:
+            LOG_WARNING("Unknown X11 key: %lx\n", key);
+            return;
+    }
+
+    keys[k_id].held = true;
+    keys[k_id].pressed = true;
+}
+
+static void release_key(KeySym key)
+{
+    LOG_TRACE("Handling key release event\n");
+    key_id k_id;
+    switch(key) {
+        case XK_Escape: {
+            k_id = KEY_ESC;
+        } break;
+        case XK_space: {
+            k_id = KEY_SPACE;
+        } break;
+        case XK_w: {
+            k_id = KEY_W;
+        } break;
+        case XK_a: {
+            k_id = KEY_A;
+        } break;
+        case XK_s: {
+            k_id = KEY_S;
+        } break;
+        case XK_d: {
+            k_id = KEY_D;
+        } break;
+        default:
+            LOG_WARNING("Unknown X11 key: %lx\n", key);
+            return;
+    }
+
+    keys[k_id].held = false;
+    keys[k_id].released = true;
+}
+
 void poll_platform_messages(void)
 {
     XEvent event;
     // TODO: Figure out what KeymapStateMask does and if I need it in addition
     // to KeyReleaseMask
-    long event_mask = KeyReleaseMask;
+    long event_mask = KeyPressMask | KeyReleaseMask;
     if(XCheckMaskEvent(g_display_server, event_mask, &event)) {
         // TODO: Figure out what last 2 parameters do (group and level)
         KeySym key = XkbKeycodeToKeysym(g_display_server, event.xkey.keycode, 0,
                                         0);
+
+        // reset all keys that were pressed or released the previous frames
+        for(int i = 0; i < NUM_KEYS; i++) {
+            keys[i].released = false;
+            keys[i].pressed = false;
+        }
+
         switch(event.type) {
+            case KeyPress: {
+                press_key(key);
+            } break;
             case KeyRelease: {
-                switch(key) {
-                    case XK_Escape: {
-                        g_exit = true;
-                    } break;
-                    case XK_w: {
-                        printf("W\n");
-                    } break;
-                    case XK_s: {
-                        printf("S\n");
-                    } break;
-                    default:
-                        printf("Event key type: %lx\n", key);
-                }
+                release_key(key);
             } break;
             default:
-                printf("Event type: %d\n", event.xkey.type);
+                LOG_WARNING("Unknown event type: %d\n", event.xkey.type);
         }
     }
 }
@@ -376,11 +435,11 @@ platform_sound_buffer* create_sound_buffer(uint32 size_frames)
 
 void destroy_sound_buffer(platform_sound_buffer* sound_buffer)
 {
-    LOG_TRACE("Destroying sound buffer");
+    LOG_TRACE("Destroying sound buffer\n");
     free(sound_buffer->buffer);
     delete sound_buffer->context;
     delete sound_buffer;
-    LOG_TRACE("Destroyed sound buffer");
+    LOG_TRACE("Destroyed sound buffer\n");
 }
 
 // FIXME: The while loop causes delay for displaying graphics
@@ -429,8 +488,22 @@ void teardown_sound()
     LOG_TRACE("Sound subsystem closed\n");
 }
 
-// uint64 get_timer(void);
-// uint64 get_timer_frequency(void);
+void init_input(void)
+{
+    LOG_TRACE("Initializing input subsystem\n");
+    for(int i = 0; i < NUM_KEYS; i++) {
+        keys[i].pressed = false;
+        keys[i].held = false;
+        keys[i].released = false;
+    }
+    LOG_TRACE("Input subsystem successfully initialized\n");
+}
+
+void teardown_input(void)
+{
+    LOG_TRACE("Tearing down input subsystem\n");
+    LOG_TRACE("Input subsystem closed\n");
+}
 
 static void test_sound()
 {

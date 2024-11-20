@@ -2,6 +2,7 @@
 #include "include/defines.h"
 #include "include/logging.h"
 #include "include/platform_layer.h"
+#include "include/input.h"
 #include <math.h> // TODO: replace functions here with own implementation
 
 // GENERAL TODO: Check all return values of all functions and log errors where
@@ -165,8 +166,8 @@ static uint32 get_frames_from_time_sec(float32 time, uint32 samples_per_second)
     return (uint32)(time * samples_per_second);
 }
 
-void game_init(uint32 width_in_pixels, uint32 height_in_pixels,
-               uint32 pixel_size)
+void game_init(const uint32 width_in_pixels, const uint32 height_in_pixels,
+               const uint32 pixel_size)
 {
     LOG_TRACE("Game init\n");
 
@@ -186,6 +187,7 @@ void game_init(uint32 width_in_pixels, uint32 height_in_pixels,
     // FIXME: No output for 1 second
     g_sound_buffer = create_sound_buffer(
         get_frames_from_time_sec(1.0f, nb_samples_per_sec));
+    init_input();
     LOG_TRACE("Game init done\n");
 }
 
@@ -196,6 +198,8 @@ void game_destroy(void)
     destroy_backbuffer(g_backbuffer);
     destroy_sound_buffer(g_sound_buffer);
     delete g_screen_info;
+    teardown_sound();
+    teardown_input();
     LOG_TRACE("Destroyed game\n");
 }
 
@@ -208,7 +212,7 @@ void game_main(void)
     write_sin_wave(g_sound_buffer, 300, 1600);
     play_sound_buffer(g_sound_buffer);
     float64 last_measurement = get_time_ms();
-    while(!should_close()) {
+    while(!keys[KEY_ESC].pressed) {
         poll_platform_messages();
         spaceship.row = 64;
         spaceship.col = 64;
@@ -218,13 +222,12 @@ void game_main(void)
         draw_sprite(alien, g_backbuffer);
         // draw_gradient(g_backbuffer, xoffset, yoffset++);
         display_backbuffer(g_backbuffer, g_window);
-        // FIXME: Implement get_time_ms instead of the timer shenannigans
 
         float64 current_measurement = get_time_ms();
         float64 elapsed_time = current_measurement - last_measurement;
         // convert to ms
         last_measurement = current_measurement;
-        printf("%f ms, %f fps\n", elapsed_time, 1000.0/(elapsed_time));
+        //printf("%f ms, %f fps\n", elapsed_time, 1000.0/(elapsed_time));
     }
     game_destroy();
 }

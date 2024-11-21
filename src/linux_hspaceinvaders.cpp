@@ -159,7 +159,6 @@ void display_backbuffer(const platform_backbuffer* backbuffer,
 
 static void press_key(KeySym key)
 {
-    LOG_TRACE("Handling key press event\n");
     key_id k_id;
     switch(key) {
         case XK_Escape: {
@@ -191,7 +190,6 @@ static void press_key(KeySym key)
 
 static void release_key(KeySym key)
 {
-    LOG_TRACE("Handling key release event\n");
     key_id k_id;
     switch(key) {
         case XK_Escape: {

@@ -24,19 +24,19 @@ struct screen_information {
     uint32 screen_height;
 };
 
-struct sprite {
+struct object {
 
-    sprite(const uint8 w, const uint8 h, const uint8* bytes, uint32 color)
-        : width { w }, height { h }, bytes { bytes }, color { color },
+    object(const uint8 w, const uint8 h, const uint8* sprite, uint32 color)
+        : width { w }, height { h }, sprite { sprite }, color { color },
           row { 0 }, col { 0 } {};
 
     const uint32 width;
     const uint32 height;
-    const uint8* bytes;
+    const uint8* sprite;
     uint32 color;
     // Current position of sprite
-    uint32 row;
-    uint32 col;
+    float32 row;
+    float32 col;
 };
 
 static screen_information* g_screen_info;
@@ -51,7 +51,7 @@ static const uint8_t spaceship_bytes[] = {
     "-**-***-**-"
     "--*--*--*--"
 };
-static sprite spaceship(11, 8, spaceship_bytes, RGBA(255, 255, 255, 0));
+static object spaceship(11, 8, spaceship_bytes, RGBA(255, 255, 255, 0));
 
 static const uint8_t alien_bytes[] = {
     "--*----*--"
@@ -63,7 +63,8 @@ static const uint8_t alien_bytes[] = {
     "--**--**--"
     "--*----*--"
 };
-static sprite alien(10, 8, alien_bytes, RGBA(255, 255, 255, 0));
+static object alien(10, 8, alien_bytes, RGBA(255, 255, 255, 0));
+static float32 g_spaceship_speed = 30;
 
 static void draw_pixel(platform_backbuffer* backbuffer, const uint32 row,
                        const uint32 col, const uint32 color)
@@ -90,12 +91,13 @@ static void draw_pixel(platform_backbuffer* backbuffer, const uint32 row,
     }
 }
 
-static void draw_sprite(sprite sprt, platform_backbuffer* backbuffer)
+static void draw_sprite(const object* obj, platform_backbuffer* backbuffer)
 {
-    for(uint32 i = 0; i < sprt.height; i++) {
-        for(uint32 j = 0; j < sprt.width; j++) {
-            if(sprt.bytes[sprt.width * i + j] == '*') {
-                draw_pixel(backbuffer, sprt.row + i, sprt.col + j, sprt.color);
+    for(uint32 i = 0; i < obj->height; i++) {
+        for(uint32 j = 0; j < obj->width; j++) {
+            if(obj->sprite[obj->width * i + j] == '*') {
+                draw_pixel(backbuffer, (int32)obj->row + i, (int32)obj->col + j,
+                           obj->color);
             }
         }
     }
@@ -203,6 +205,31 @@ void game_destroy(void)
     LOG_TRACE("Destroyed game\n");
 }
 
+void process_input(float64 delta)
+{
+    if(keys[KEY_A].held) {
+        if(spaceship.col - delta * g_spaceship_speed > 0) {
+            spaceship.col -= delta * g_spaceship_speed;
+        }
+    } else if(keys[KEY_D].held) {
+        if(spaceship.col + delta * g_spaceship_speed
+           < g_screen_info->width_in_pixels - spaceship.width + 1) {
+            spaceship.col += delta * g_spaceship_speed;
+        }
+    }
+}
+
+void clear_screen(platform_backbuffer* backbuffer)
+{
+    uint32* pixels = (uint32_t*)backbuffer->bitmap;
+    uint32 num_cols = backbuffer->width;
+    for(uint32 i = 0; i < backbuffer->height; i++) {
+        for(uint32 j = 0; j < backbuffer->width; j++) {
+            pixels[i * num_cols + j] = RGBA(0, 0, 0, 0);
+        }
+    }
+}
+
 void game_main(void)
 {
     game_init(128, 128, 8);
@@ -212,22 +239,26 @@ void game_main(void)
     write_sin_wave(g_sound_buffer, 300, 1600);
     play_sound_buffer(g_sound_buffer);
     float64 last_measurement = get_time_ms();
+    float64 delta = 1;
+    spaceship.row = 100;
+    spaceship.col = 64;
+    alien.row = 32;
+    alien.col = 64;
     while(!keys[KEY_ESC].pressed) {
+        clear_screen(g_backbuffer);
         poll_platform_messages();
-        spaceship.row = 64;
-        spaceship.col = 64;
-        alien.row = 32;
-        alien.col = 64;
-        draw_sprite(spaceship, g_backbuffer);
-        draw_sprite(alien, g_backbuffer);
+        process_input(delta);
+        draw_sprite(&spaceship, g_backbuffer);
+        draw_sprite(&alien, g_backbuffer);
         // draw_gradient(g_backbuffer, xoffset, yoffset++);
         display_backbuffer(g_backbuffer, g_window);
 
         float64 current_measurement = get_time_ms();
-        float64 elapsed_time = current_measurement - last_measurement;
+        float64 elapsed_time_ms = current_measurement - last_measurement;
+        delta = elapsed_time_ms / 1000;
         // convert to ms
         last_measurement = current_measurement;
-        //printf("%f ms, %f fps\n", elapsed_time, 1000.0/(elapsed_time));
+        // printf("%f ms, %f fps\n", elapsed_time_ms, 1000.0 / (elapsed_time_ms));
     }
     game_destroy();
 }

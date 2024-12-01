@@ -63,7 +63,7 @@ static void _assert(const char* filename, const int line, const bool condition,
 #endif
 
 #if ENABLE_ASSERTS == 1
-#define ASSERT(condition, format, ...) _assert(__FILE__, __LINE__, condition, format, __VA_ARGS__)
+#define ASSERT(condition, ...) _assert(__FILE__, __LINE__, condition, __VA_ARGS__)
 #else
 #define ASSERT(condition, ...)
 #endif

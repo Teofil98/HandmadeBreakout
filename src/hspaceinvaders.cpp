@@ -1,8 +1,9 @@
 #include "include/hspaceinvaders.h"
 #include "include/defines.h"
+#include "include/entities.h"
+#include "include/input.h"
 #include "include/logging.h"
 #include "include/platform_layer.h"
-#include "include/input.h"
 #include <math.h> // TODO: replace functions here with own implementation
 
 // GENERAL TODO: Check all return values of all functions and log errors where
@@ -41,7 +42,7 @@ struct object {
 
 static screen_information* g_screen_info;
 
-static const uint8_t spaceship_bytes[] = {
+static const uint8 spaceship_bytes[] = {
     "-----*-----"
     "----***----"
     "--*-*-*-*--"
@@ -51,9 +52,8 @@ static const uint8_t spaceship_bytes[] = {
     "-**-***-**-"
     "--*--*--*--"
 };
-static object spaceship(11, 8, spaceship_bytes, RGBA(255, 255, 255, 0));
 
-static const uint8_t alien_bytes[] = {
+static const uint8 alien_bytes[] = {
     "--*----*--"
     "---*--*---"
     "--******--"
@@ -63,8 +63,64 @@ static const uint8_t alien_bytes[] = {
     "--**--**--"
     "--*----*--"
 };
-static object alien(10, 8, alien_bytes, RGBA(255, 255, 255, 0));
+
+static const uint8 projectile_bytes[] = {
+    "*"
+    "*"
+};
+
 static float32 g_spaceship_speed = 30;
+static entity_id spaceship_id;
+
+static entity_id create_spaceship()
+{
+    entity_id id = get_new_entity_id();
+
+    position_component pos;
+    pos.x = 64;
+    pos.y = 100;
+
+    sprite_component sprt;
+    sprt.color = COLOR_WHITE;
+    sprt.sprite = spaceship_bytes;
+    sprt.width = 11;
+    sprt.height = 8;
+
+    bounding_box_component box;
+    box.width = sprt.width;
+    box.height = sprt.height;
+
+    positions[id] = pos;
+    sprites[id] = sprt;
+    bounding_boxes[id] = box;
+
+    return id;
+}
+
+static entity_id create_alien(const uint32 row, const uint32 col)
+{
+    entity_id id = get_new_entity_id();
+
+    position_component pos;
+    pos.x = col;
+    pos.y = row;
+
+    sprite_component sprt;
+    sprt.color = COLOR_WHITE;
+    sprt.sprite = alien_bytes;
+    sprt.width = 10;
+    sprt.height = 8;
+
+    bounding_box_component box;
+    box.width = sprt.width;
+    box.height = sprt.height;
+
+    positions[id] = pos;
+    sprites[id] = sprt;
+    bounding_boxes[id] = box;
+
+    return id;
+}
 
 static void draw_pixel(platform_backbuffer* backbuffer, const uint32 row,
                        const uint32 col, const uint32 color)
@@ -91,14 +147,29 @@ static void draw_pixel(platform_backbuffer* backbuffer, const uint32 row,
     }
 }
 
-static void draw_sprite(const object* obj, platform_backbuffer* backbuffer)
+static void draw_sprite(const entity_id id, platform_backbuffer* backbuffer)
 {
-    for(uint32 i = 0; i < obj->height; i++) {
-        for(uint32 j = 0; j < obj->width; j++) {
-            if(obj->sprite[obj->width * i + j] == '*') {
-                draw_pixel(backbuffer, (int32)obj->row + i, (int32)obj->col + j,
-                           obj->color);
+    uint32 height = sprites[id].height;
+    uint32 width = sprites[id].width;
+    const uint8* sprite = sprites[id].sprite;
+    uint32 color = sprites[id].color;
+    uint32 entity_row = (uint32)positions[id].y;
+    uint32 entity_col = (uint32)positions[id].x;
+
+    for(uint32 i = 0; i < height; i++) {
+        for(uint32 j = 0; j < width; j++) {
+            if(sprite[width * i + j] == '*') {
+                draw_pixel(backbuffer, entity_row + i, entity_col + j, color);
             }
+        }
+    }
+}
+
+static void draw_sprites(platform_backbuffer* backbuffer)
+{
+    for(entity_id i = 0; i < MAX_ENTITIES; i++) {
+        if(entity_in_use[i]) {
+            draw_sprite(i, backbuffer);
         }
     }
 }
@@ -190,6 +261,7 @@ void game_init(const uint32 width_in_pixels, const uint32 height_in_pixels,
     g_sound_buffer = create_sound_buffer(
         get_frames_from_time_sec(1.0f, nb_samples_per_sec));
     init_input();
+    init_entity_system();
     LOG_TRACE("Game init done\n");
 }
 
@@ -208,18 +280,20 @@ void game_destroy(void)
 void process_input(float64 delta)
 {
     if(keys[KEY_A].held) {
-        if(spaceship.col - delta * g_spaceship_speed > 0) {
-            spaceship.col -= delta * g_spaceship_speed;
+        if(positions[spaceship_id].x - delta * g_spaceship_speed > 0) {
+            positions[spaceship_id].x -= delta * g_spaceship_speed;
         }
     } else if(keys[KEY_D].held) {
-        if(spaceship.col + delta * g_spaceship_speed
-           < g_screen_info->width_in_pixels - spaceship.width + 1) {
-            spaceship.col += delta * g_spaceship_speed;
+        if(positions[spaceship_id].x + delta * g_spaceship_speed
+           < g_screen_info->width_in_pixels - bounding_boxes[spaceship_id].width
+                 + 1) {
+            positions[spaceship_id].x += delta * g_spaceship_speed;
         }
     }
 }
 
-void clear_screen(platform_backbuffer* backbuffer)
+// OPTIMIZE: Memcpy
+static void clear_screen(platform_backbuffer* backbuffer)
 {
     uint32* pixels = (uint32_t*)backbuffer->bitmap;
     uint32 num_cols = backbuffer->width;
@@ -239,18 +313,16 @@ void game_main(void)
     write_sin_wave(g_sound_buffer, 300, 1600);
     play_sound_buffer(g_sound_buffer);
     float64 last_measurement = get_time_ms();
+    // TODO: What should be the first value of delta?
     float64 delta = 1;
-    spaceship.row = 100;
-    spaceship.col = 64;
-    alien.row = 32;
-    alien.col = 64;
+    spaceship_id = create_spaceship();
+    entity_id alien_id = create_alien(32, 64);
+    float64 avg_fps = 0;
     while(!keys[KEY_ESC].pressed) {
         clear_screen(g_backbuffer);
         poll_platform_messages();
         process_input(delta);
-        draw_sprite(&spaceship, g_backbuffer);
-        draw_sprite(&alien, g_backbuffer);
-        // draw_gradient(g_backbuffer, xoffset, yoffset++);
+        draw_sprites(g_backbuffer);
         display_backbuffer(g_backbuffer, g_window);
 
         float64 current_measurement = get_time_ms();
@@ -258,7 +330,16 @@ void game_main(void)
         delta = elapsed_time_ms / 1000;
         // convert to ms
         last_measurement = current_measurement;
-        // printf("%f ms, %f fps\n", elapsed_time_ms, 1000.0 / (elapsed_time_ms));
+        // printf("%f ms, %f fps\n", elapsed_time_ms, 1000.0 /
+        // (elapsed_time_ms));
+        float64 fps = 1000.0 / elapsed_time_ms;
+        if(avg_fps == 0) {
+            avg_fps = fps;
+        } else {
+            avg_fps += fps;
+            avg_fps /= 2;
+        }
     }
+    printf("Avg fps: %f\n", avg_fps);
     game_destroy();
 }

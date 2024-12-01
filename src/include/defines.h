@@ -14,11 +14,15 @@
 #define RGBA_BLUE(x) ((uint8_t)x << 0)
 #define RGBA(r, g, b, a) (RGBA_RED(r) | RGBA_GREEN(g) | RGBA_BLUE(b) | RGBA_ALPHA(a))
 
+#define COLOR_WHITE RGBA(255,255,255,0)
+
 #define DEFAULT_WINDOW_W 1280
 #define DEFAULT_WINDOW_H 720
 #define WINDOW_TITLE "Handmade Space Invaders"
 
 #define PI 3.14159265359
+
+#define MAX_ENTITIES 100
 
 using uint64  = uint64_t;
 using uint32  = uint32_t;

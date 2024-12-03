@@ -72,7 +72,7 @@ static const uint8 projectile_bytes[] = {
 static float32 g_spaceship_speed = 30;
 static entity_id spaceship_id;
 
-static entity_id create_spaceship()
+static entity_id create_spaceship(void)
 {
     entity_id id = get_new_entity_id();
 
@@ -93,6 +93,8 @@ static entity_id create_spaceship()
     positions[id] = pos;
     sprites[id] = sprt;
     bounding_boxes[id] = box;
+
+    components_used[id] = POSITION_COMP | SPRITE_COMP | BBOX_COMP;
 
     return id;
 }
@@ -118,6 +120,42 @@ static entity_id create_alien(const uint32 row, const uint32 col)
     positions[id] = pos;
     sprites[id] = sprt;
     bounding_boxes[id] = box;
+
+    components_used[id] = POSITION_COMP | SPRITE_COMP | BBOX_COMP;
+
+    return id;
+}
+
+static entity_id create_projectile(const uint32 row, const uint32 col,
+                                   const float32 dir_x, const float32 dir_y)
+{
+    entity_id id = get_new_entity_id();
+
+    position_component pos;
+    pos.x = col;
+    pos.y = row;
+
+    sprite_component sprt;
+    sprt.sprite = projectile_bytes;
+    sprt.color = COLOR_WHITE;
+    sprt.width = 1;
+    sprt.height = 2;
+
+    bounding_box_component box;
+    box.width = sprt.width;
+    box.height = sprt.height;
+
+    direction_component dir;
+    dir.x = dir_x;
+    dir.y = dir_y;
+
+    positions[id] = pos;
+    sprites[id] = sprt;
+    bounding_boxes[id] = box;
+    directions[id] = dir;
+
+    components_used[id] = POSITION_COMP | SPRITE_COMP | BBOX_COMP
+                          | DIRECTION_COMP;
 
     return id;
 }
@@ -170,6 +208,18 @@ static void draw_sprites(platform_backbuffer* backbuffer)
     for(entity_id i = 0; i < MAX_ENTITIES; i++) {
         if(entity_in_use[i]) {
             draw_sprite(i, backbuffer);
+        }
+    }
+}
+
+static void update_entity_positions(float64 delta)
+{
+    uint64 key = POSITION_COMP | DIRECTION_COMP;
+
+    for(entity_id id = 0; id < MAX_ENTITIES; id++) {
+        if(entity_in_use[id] && ((components_used[id] & key) == key)) {
+            positions[id].x += (directions[id].x * delta);
+            positions[id].y += (directions[id].y * delta);
         }
     }
 }
@@ -314,14 +364,16 @@ void game_main(void)
     play_sound_buffer(g_sound_buffer);
     float64 last_measurement = get_time_ms();
     // TODO: What should be the first value of delta?
-    float64 delta = 1;
+    float64 delta = 0;
     spaceship_id = create_spaceship();
     entity_id alien_id = create_alien(32, 64);
+    create_projectile(32, 32, 0, 1);
     float64 avg_fps = 0;
     while(!keys[KEY_ESC].pressed) {
         clear_screen(g_backbuffer);
         poll_platform_messages();
         process_input(delta);
+        update_entity_positions(delta);
         draw_sprites(g_backbuffer);
         display_backbuffer(g_backbuffer, g_window);
 

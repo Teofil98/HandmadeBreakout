@@ -22,7 +22,6 @@
 
 #define PI 3.14159265359
 
-#define MAX_ENTITIES 100
 
 using uint64  = uint64_t;
 using uint32  = uint32_t;

@@ -212,6 +212,49 @@ static void draw_sprites(platform_backbuffer* backbuffer)
     }
 }
 
+static bool out_of_bounds(entity_id id)
+{
+    position_component top_left = positions[id];
+    position_component bottom_right;
+    bottom_right.x = positions[id].x + bounding_boxes[id].width - 1;
+    bottom_right.y = positions[id].y + bounding_boxes[id].height - 1;
+
+    // check out of bounds with the top
+    if(top_left.y < 0) {
+        return true;
+    }
+
+    // check out of bounds with the bottom
+    if(bottom_right.y > g_screen_info->height_in_pixels) {
+        return true;
+    }
+
+    // check out of bounds with left side
+    if(top_left.x < 0) {
+        return true;
+    }
+
+    // check out of bounds with right side
+    if(bottom_right.x > g_screen_info->width_in_pixels) {
+        return true;
+    }
+
+    return false;
+}
+
+static void check_collisions(void)
+{
+    uint64 key = BBOX_COMP;
+    // check out of bounds objects
+    for(entity_id id = 0; id < MAX_ENTITIES; id++) {
+        if(entity_in_use[id] && ((components_used[id] & key) == key)) {
+            if(out_of_bounds(id)) {
+                delete_entity_id(id);
+            }
+        }
+    }
+}
+
 static void update_entity_positions(float64 delta)
 {
     uint64 key = POSITION_COMP | DIRECTION_COMP;
@@ -329,16 +372,14 @@ void game_destroy(void)
 
 void process_input(float64 delta)
 {
+    position_component old_position = positions[spaceship_id];
     if(keys[KEY_A].held) {
-        if(positions[spaceship_id].x - delta * g_spaceship_speed > 0) {
-            positions[spaceship_id].x -= delta * g_spaceship_speed;
-        }
+        positions[spaceship_id].x -= delta * g_spaceship_speed;
     } else if(keys[KEY_D].held) {
-        if(positions[spaceship_id].x + delta * g_spaceship_speed
-           < g_screen_info->width_in_pixels - bounding_boxes[spaceship_id].width
-                 + 1) {
-            positions[spaceship_id].x += delta * g_spaceship_speed;
-        }
+        positions[spaceship_id].x += delta * g_spaceship_speed;
+    }
+    if(out_of_bounds(spaceship_id)) {
+        positions[spaceship_id] = old_position;
     }
 }
 
@@ -367,13 +408,14 @@ void game_main(void)
     float64 delta = 0;
     spaceship_id = create_spaceship();
     entity_id alien_id = create_alien(32, 64);
-    create_projectile(32, 32, 0, 1);
+    create_projectile(32, 32, 0, -30);
     float64 avg_fps = 0;
     while(!keys[KEY_ESC].pressed) {
         clear_screen(g_backbuffer);
         poll_platform_messages();
         process_input(delta);
         update_entity_positions(delta);
+        check_collisions();
         draw_sprites(g_backbuffer);
         display_backbuffer(g_backbuffer, g_window);
 

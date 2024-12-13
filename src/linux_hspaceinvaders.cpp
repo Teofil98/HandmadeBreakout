@@ -1,11 +1,11 @@
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
 #include "include/defines.h"
 #include "include/hspaceinvaders.h"
+#include "include/input.h"
 #include "include/logging.h"
 #include "include/platform_layer.h"
-#include "include/input.h"
 #include <X11/XKBlib.h>
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
 #include <alsa/asoundlib.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -73,6 +73,7 @@ platform_window* open_window(const char* title, const uint32 width,
         CWBackPixel | CWBorderPixel | CWEventMask, &attributes);
 
     GC gc = XCreateGC(g_display_server, window, 0, NULL);
+    XAutoRepeatOff(g_display_server);
 
     XTextProperty window_title_propery;
     uint32 title_size = strlen(title);
@@ -94,7 +95,6 @@ platform_window* open_window(const char* title, const uint32 width,
     plat_window->title = title_cpy;
     plat_window->context->gc = gc;
     plat_window->context->window = window;
-
 
     return plat_window;
 }
@@ -123,8 +123,8 @@ platform_backbuffer* create_backbuffer(const uint32 width, const uint32 height,
     char* backbuffer = (char*)malloc(bytes_per_pixel * height * width);
     XImage* image = XCreateImage(
         g_display_server, DefaultVisual(g_display_server, g_screen),
-        DefaultDepth(g_display_server, g_screen), ZPixmap, 0, backbuffer,
-        width, height,
+        DefaultDepth(g_display_server, g_screen), ZPixmap, 0, backbuffer, width,
+        height,
         32, // TODO: probably want to change this bitmap_pad to 32 once I get
             // the depth sorted out
         0);
@@ -184,8 +184,10 @@ static void press_key(KeySym key)
             return;
     }
 
+    if(!keys[k_id].held) {
+        keys[k_id].pressed = true;
+    }
     keys[k_id].held = true;
-    keys[k_id].pressed = true;
 }
 
 static void release_key(KeySym key)
@@ -221,6 +223,12 @@ static void release_key(KeySym key)
 
 void poll_platform_messages(void)
 {
+    // reset all keys that were pressed or released the previous frames
+    for(int i = 0; i < NUM_KEYS; i++) {
+        keys[i].released = false;
+        keys[i].pressed = false;
+    }
+
     XEvent event;
     // TODO: Figure out what KeymapStateMask does and if I need it in addition
     // to KeyReleaseMask
@@ -229,12 +237,6 @@ void poll_platform_messages(void)
         // TODO: Figure out what last 2 parameters do (group and level)
         KeySym key = XkbKeycodeToKeysym(g_display_server, event.xkey.keycode, 0,
                                         0);
-
-        // reset all keys that were pressed or released the previous frames
-        for(int i = 0; i < NUM_KEYS; i++) {
-            keys[i].released = false;
-            keys[i].pressed = false;
-        }
 
         switch(event.type) {
             case KeyPress: {
@@ -325,40 +327,40 @@ void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
     // snd_pcm_hw_params?
     snd_pcm_uframes_t max_frames;
     snd_pcm_hw_params_get_buffer_size_max(g_linux_context.snd_hw_params,
-            &max_frames);
+                                          &max_frames);
     LOG_TRACE("Maximum  number of frames: %ld\n", max_frames);
     // TODO: Figure out what buffer size I want to use
     const uint32 period_size = 1000;
     max_frames = max_frames < period_size ? max_frames : period_size;
     g_linux_context.max_hw_frames = max_frames;
     ret = snd_pcm_hw_params_set_period_size_near(
-            g_linux_context.pcm_device_handle, g_linux_context.snd_hw_params,
-            &max_frames, &dir);
+        g_linux_context.pcm_device_handle, g_linux_context.snd_hw_params,
+        &max_frames, &dir);
     if(ret < 0) {
         LOG_ERROR("Alsa: Error setting number of frames: %s\n",
-                snd_strerror(ret));
+                  snd_strerror(ret));
     }
 
     // Write the parameters to the driver
     ret = snd_pcm_hw_params(g_linux_context.pcm_device_handle,
-            g_linux_context.snd_hw_params);
+                            g_linux_context.snd_hw_params);
     if(ret < 0) {
         LOG_ERROR("Alsa: Unable to set hw parameters: %s\n", snd_strerror(ret));
     }
 
     uint32 max_period_us;
     ret = snd_pcm_hw_params_get_period_time_max(g_linux_context.snd_hw_params,
-            &max_period_us, &dir);
+                                                &max_period_us, &dir);
     if(ret < 0) {
         LOG_ERROR("Alsa: Unable to get period time max: %s\n",
-                snd_strerror(ret));
+                  snd_strerror(ret));
     }
     LOG_TRACE("Max period size: %f ms\n", max_period_us / 1000.0f);
 
     snd_pcm_state_t state = snd_pcm_state(g_linux_context.pcm_device_handle);
     if(state != SND_PCM_STATE_PREPARED) {
         LOG_ERROR(
-                "Alsa: PCM device not in prepared state after initalization\n");
+            "Alsa: PCM device not in prepared state after initalization\n");
     }
 
     uint32 samples;
@@ -455,8 +457,8 @@ void play_sound_buffer(platform_sound_buffer* sound_buffer)
                                     : g_linux_context.max_hw_frames;
         int32 ret;
         frames_to_play = frames_to_play < 400 ? frames_to_play : 400;
-        ret = snd_pcm_writei(g_linux_context.pcm_device_handle,
-                             buffer, frames_to_play);
+        ret = snd_pcm_writei(g_linux_context.pcm_device_handle, buffer,
+                             frames_to_play);
         // Move forward in the buffer by the number of frames
         // 1 frame = 2 samples, 1 sample = 2 bytes
         buffer = (void*)((char*)buffer + frames_to_play * 4);
@@ -464,7 +466,7 @@ void play_sound_buffer(platform_sound_buffer* sound_buffer)
             // EPIPE means underrun
             // TODO: Log and see what I want to do here
             LOG_WARNING("Alsa: Underrun occurred\n");
-            //FIXME: Do a prepare after an underrun?
+            // FIXME: Do a prepare after an underrun?
         } else if(ret < 0) {
             LOG_ERROR("Alsa: Error from writei: %s\n", snd_strerror(ret));
         } else if(ret != (int32)frames_to_play) {

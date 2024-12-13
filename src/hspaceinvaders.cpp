@@ -378,6 +378,14 @@ void process_input(float64 delta)
     } else if(keys[KEY_D].held) {
         positions[spaceship_id].x += delta * g_spaceship_speed;
     }
+
+    if(keys[KEY_SPACE].pressed) {
+        uint32 proj_row = positions[spaceship_id].y - 1;
+        uint32 proj_col = positions[spaceship_id].x
+                          + sprites[spaceship_id].width / 2;
+        create_projectile(proj_row, proj_col, 0, -30);
+    }
+
     if(out_of_bounds(spaceship_id)) {
         positions[spaceship_id] = old_position;
     }
@@ -408,7 +416,6 @@ void game_main(void)
     float64 delta = 0;
     spaceship_id = create_spaceship();
     entity_id alien_id = create_alien(32, 64);
-    create_projectile(32, 32, 0, -30);
     float64 avg_fps = 0;
     while(!keys[KEY_ESC].pressed) {
         clear_screen(g_backbuffer);

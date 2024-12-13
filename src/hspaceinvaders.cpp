@@ -9,6 +9,9 @@
 // GENERAL TODO: Check all return values of all functions and log errors where
 // needed. I Probably missed a few places so far in ALL SOURCE FILES SO FAR :)
 
+#define ALIENS_ROWS 4
+#define ALIENS_COLS 6
+
 struct screen_information {
 
     screen_information(uint32 wip, uint32 hip, uint32 ps)
@@ -42,6 +45,7 @@ struct object {
 
 static screen_information* g_screen_info;
 
+
 static const uint8 spaceship_bytes[] = {
     "-----*-----"
     "----***----"
@@ -71,6 +75,9 @@ static const uint8 projectile_bytes[] = {
 
 static float32 g_spaceship_speed = 30;
 static entity_id spaceship_id;
+static entity_id aliens[ALIENS_ROWS * ALIENS_COLS];
+static uint32 g_alien_width = 10;
+static uint32 g_alien_height = 8;
 
 static entity_id create_spaceship(void)
 {
@@ -110,8 +117,8 @@ static entity_id create_alien(const uint32 row, const uint32 col)
     sprite_component sprt;
     sprt.color = COLOR_WHITE;
     sprt.sprite = alien_bytes;
-    sprt.width = 10;
-    sprt.height = 8;
+    sprt.width = g_alien_width;
+    sprt.height = g_alien_height;
 
     bounding_box_component box;
     box.width = sprt.width;
@@ -124,6 +131,23 @@ static entity_id create_alien(const uint32 row, const uint32 col)
     components_used[id] = POSITION_COMP | SPRITE_COMP | BBOX_COMP;
 
     return id;
+}
+
+static void create_alien_matrix(void)
+{
+    const uint32 initial_col = 2;
+    const uint32 initial_row = 2;
+    uint32 row_space = 0;
+    for(uint32 i = 0; i < ALIENS_ROWS; i++) {
+        uint32 col_space = 0;
+        for(uint32 j = 0; j < ALIENS_COLS; j++) {
+            const uint32 row = initial_row + i * g_alien_height + row_space;
+            const uint32 col = initial_col + j * g_alien_width + col_space;
+            col_space += 3;
+            aliens[i * ALIENS_COLS + j] = create_alien(row, col);
+        }
+        row_space += 2;
+    }
 }
 
 static entity_id create_projectile(const uint32 row, const uint32 col,
@@ -415,7 +439,7 @@ void game_main(void)
     // TODO: What should be the first value of delta?
     float64 delta = 0;
     spaceship_id = create_spaceship();
-    entity_id alien_id = create_alien(32, 64);
+    create_alien_matrix();
     float64 avg_fps = 0;
     while(!keys[KEY_ESC].pressed) {
         clear_screen(g_backbuffer);

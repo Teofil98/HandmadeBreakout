@@ -11,7 +11,7 @@ uint64 components_used[MAX_ENTITIES];
 bool entity_in_use[MAX_ENTITIES];
 static stack<entity_id, MAX_ENTITIES> available_entity_ids;
 
-void init_entity_system()
+void init_entity_system(void)
 {
     for(entity_id i = MAX_ENTITIES - 1; i > 0; i--) {
         available_entity_ids.push(i);
@@ -19,11 +19,12 @@ void init_entity_system()
         // automatically initialized to 0. But I like to be explicit :)
         entity_in_use[i] = false;
     }
-    available_entity_ids.push(0);
+    // Make 0 invalid entity_id
+    // available_entity_ids.push(0);
     entity_in_use[0] = false;
 }
 
-entity_id get_new_entity_id()
+entity_id get_new_entity_id(void)
 {
     entity_id id = available_entity_ids.pop();
     entity_in_use[id] = true;

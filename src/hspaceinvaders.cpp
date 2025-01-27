@@ -4,6 +4,7 @@
 #include "include/input.h"
 #include "include/logging.h"
 #include "include/platform_layer.h"
+#include "include/array.h"
 #include <math.h> // TODO: replace functions here with own implementation
 
 // GENERAL TODO: Check all return values of all functions and log errors where
@@ -45,7 +46,6 @@ struct object {
 
 static screen_information* g_screen_info;
 
-
 static const uint8 spaceship_bytes[] = {
     "-----*-----"
     "----***----"
@@ -74,8 +74,11 @@ static const uint8 projectile_bytes[] = {
 };
 
 static float32 g_spaceship_speed = 30;
-static entity_id spaceship_id;
-static entity_id aliens[ALIENS_ROWS * ALIENS_COLS];
+static int32 g_projectile_speed = -60;
+static entity_id g_spaceship_id;
+static my_lib::array<entity_id, ALIENS_ROWS * ALIENS_COLS> g_aliens;
+static entity_id g_spaceship_projectile;
+// static entity_id aliens[ALIENS_ROWS * ALIENS_COLS];
 static uint32 g_alien_width = 10;
 static uint32 g_alien_height = 8;
 
@@ -133,18 +136,20 @@ static entity_id create_alien(const uint32 row, const uint32 col)
     return id;
 }
 
+
 static void create_alien_matrix(void)
 {
     const uint32 initial_col = 2;
     const uint32 initial_row = 2;
     uint32 row_space = 0;
+    g_aliens.resize(ALIENS_ROWS * ALIENS_COLS);
     for(uint32 i = 0; i < ALIENS_ROWS; i++) {
         uint32 col_space = 0;
         for(uint32 j = 0; j < ALIENS_COLS; j++) {
             const uint32 row = initial_row + i * g_alien_height + row_space;
             const uint32 col = initial_col + j * g_alien_width + col_space;
             col_space += 3;
-            aliens[i * ALIENS_COLS + j] = create_alien(row, col);
+            g_aliens[i * ALIENS_COLS + j] = create_alien(row, col);
         }
         row_space += 2;
     }
@@ -266,6 +271,50 @@ static bool out_of_bounds(entity_id id)
     return false;
 }
 
+static bool collide(entity_id obj1, entity_id obj2)
+{
+    uint64 key = BBOX_COMP | POSITION_COMP;
+    ASSERT((components_used[obj1] & key) == key,
+           "Trying to perform collisions on an object that has no bounding box "
+           "or position! (first object in collision - entity_id: %ld)\n",
+           obj1);
+    ASSERT((components_used[obj2] & key) == key,
+           "Trying to perform collisions on an object that has no bounding box "
+           "or position! (second object in collision - entity_id: %ld)\n",
+           obj2);
+
+    bounding_box_component bbox1 = bounding_boxes[obj1];
+    bounding_box_component bbox2 = bounding_boxes[obj2];
+
+    position_component pos1 = positions[obj1];
+    position_component pos2 = positions[obj2];
+
+    // check if there are collisions on both X and Y axes since we are using
+    // AABB
+    return (pos1.x + bbox1.width >= pos2.x
+            && pos2.x + bbox2.width >= pos1.x
+            && pos1.y + bbox1.height >= pos2.y
+            && pos2.y + bbox2.height >= pos1.y);
+}
+
+static void collide_user_proj(void)
+{
+    uint64 curr_alien = 0;
+
+    while(curr_alien < g_aliens.get_size()) {
+        if(collide(g_spaceship_projectile, g_aliens[curr_alien])) {
+            delete_entity_id(g_aliens[curr_alien]);
+            g_aliens[curr_alien] = INVALID_ENTITY;
+            delete_entity_id(g_spaceship_projectile);
+            g_spaceship_projectile = INVALID_ENTITY;
+            g_aliens.delete_idx_fast(curr_alien);
+            break;
+        } else {
+            curr_alien++;
+        }
+    }
+}
+
 static void check_collisions(void)
 {
     uint64 key = BBOX_COMP;
@@ -274,8 +323,15 @@ static void check_collisions(void)
         if(entity_in_use[id] && ((components_used[id] & key) == key)) {
             if(out_of_bounds(id)) {
                 delete_entity_id(id);
+                if(id == g_spaceship_projectile) {
+                    g_spaceship_projectile = INVALID_ENTITY;
+                }
             }
         }
+    }
+
+    if(entity_in_use[g_spaceship_projectile]) {
+        collide_user_proj();
     }
 }
 
@@ -396,22 +452,24 @@ void game_destroy(void)
 
 void process_input(float64 delta)
 {
-    position_component old_position = positions[spaceship_id];
+    position_component old_position = positions[g_spaceship_id];
     if(keys[KEY_A].held) {
-        positions[spaceship_id].x -= delta * g_spaceship_speed;
+        positions[g_spaceship_id].x -= delta * g_spaceship_speed;
     } else if(keys[KEY_D].held) {
-        positions[spaceship_id].x += delta * g_spaceship_speed;
+        positions[g_spaceship_id].x += delta * g_spaceship_speed;
     }
 
     if(keys[KEY_SPACE].pressed) {
-        uint32 proj_row = positions[spaceship_id].y - 1;
-        uint32 proj_col = positions[spaceship_id].x
-                          + sprites[spaceship_id].width / 2;
-        create_projectile(proj_row, proj_col, 0, -30);
+        uint32 proj_row = positions[g_spaceship_id].y - 1;
+        uint32 proj_col = positions[g_spaceship_id].x
+                          + sprites[g_spaceship_id].width / 2;
+        if(g_spaceship_projectile == INVALID_ENTITY) {
+            g_spaceship_projectile = create_projectile(proj_row, proj_col, 0, g_projectile_speed);
+        }
     }
 
-    if(out_of_bounds(spaceship_id)) {
-        positions[spaceship_id] = old_position;
+    if(out_of_bounds(g_spaceship_id)) {
+        positions[g_spaceship_id] = old_position;
     }
 }
 
@@ -438,7 +496,7 @@ void game_main(void)
     float64 last_measurement = get_time_ms();
     // TODO: What should be the first value of delta?
     float64 delta = 0;
-    spaceship_id = create_spaceship();
+    g_spaceship_id = create_spaceship();
     create_alien_matrix();
     float64 avg_fps = 0;
     while(!keys[KEY_ESC].pressed) {

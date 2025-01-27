@@ -13,7 +13,7 @@ static void _vlog_print(const char* error_type, const char* filename,
     vprintf(frmat, args);
 }
 
-static void _log_print(const char* error_type, const char* filename,
+static inline void _log_print(const char* error_type, const char* filename,
                        const int32 line, const char* frmat, ...)
 {
     va_list args;
@@ -22,7 +22,7 @@ static void _log_print(const char* error_type, const char* filename,
     va_end(args);
 }
 
-static void _log_error(const char* filename, const int32 line,
+static inline void _log_error(const char* filename, const int32 line,
                        const char* format, ...)
 {
     va_list args;
@@ -32,7 +32,7 @@ static void _log_error(const char* filename, const int32 line,
     exit(1);
 }
 
-static void _assert(const char* filename, const int line, const bool condition,
+static inline void _assert(const char* filename, const int line, const bool condition,
                     const char* format, ...)
 {
     if(!condition) {

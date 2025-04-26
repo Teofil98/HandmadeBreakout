@@ -474,13 +474,13 @@ void process_input(float64 delta)
 }
 
 // OPTIMIZE: Memcpy
-static void clear_screen(platform_backbuffer* backbuffer)
+static void clear_screen(platform_backbuffer* backbuffer, uint32 color)
 {
     uint32* pixels = (uint32_t*)backbuffer->bitmap;
     uint32 num_cols = backbuffer->width;
     for(uint32 i = 0; i < backbuffer->height; i++) {
         for(uint32 j = 0; j < backbuffer->width; j++) {
-            pixels[i * num_cols + j] = RGBA(0, 0, 0, 0);
+            pixels[i * num_cols + j] = color;
         }
     }
 }
@@ -523,13 +523,20 @@ void game_main(void)
 
         // check if the game has ended
         if(player_won()) {
-            printf("Game won!\n");
-
-        } else if(player_lost()) {
-            printf("Game lost!\n");
+            clear_screen(g_backbuffer, COLOR_GREEN);
+            poll_platform_messages();
+            display_backbuffer(g_backbuffer, g_window);
+            continue;
         }
 
-        clear_screen(g_backbuffer);
+        if(player_lost()) {
+            clear_screen(g_backbuffer, COLOR_RED);
+            poll_platform_messages();
+            display_backbuffer(g_backbuffer, g_window);
+            continue;
+        }
+
+        clear_screen(g_backbuffer, COLOR_BLACK);
         poll_platform_messages();
         process_input(delta);
         update_entity_positions(delta);

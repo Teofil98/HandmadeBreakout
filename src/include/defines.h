@@ -16,6 +16,9 @@
 #define RGBA(r, g, b, a) (RGBA_RED(r) | RGBA_GREEN(g) | RGBA_BLUE(b) | RGBA_ALPHA(a))
 
 #define COLOR_WHITE RGBA(255,255,255,0)
+#define COLOR_BLACK RGBA(0,0,0,0)
+#define COLOR_GREEN RGBA(0,255,0,0)
+#define COLOR_RED RGBA(255,0,0,0)
 
 #define DEFAULT_WINDOW_W 1280
 #define DEFAULT_WINDOW_H 720

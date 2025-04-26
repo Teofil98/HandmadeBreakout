@@ -2,6 +2,7 @@
 
 enum key_id {
     KEY_W,
+    KEY_R,
     KEY_A,
     KEY_S,
     KEY_D,

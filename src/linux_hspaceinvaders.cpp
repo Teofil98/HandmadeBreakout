@@ -157,31 +157,42 @@ void display_backbuffer(const platform_backbuffer* backbuffer,
               backbuffer->height);
 }
 
-static void press_key(KeySym key)
+static status convert_x11_key(KeySym key, key_id *k_id)
 {
-    key_id k_id;
     switch(key) {
         case XK_Escape: {
-            k_id = KEY_ESC;
+            *k_id = KEY_ESC;
         } break;
         case XK_space: {
-            k_id = KEY_SPACE;
+            *k_id = KEY_SPACE;
         } break;
         case XK_w: {
-            k_id = KEY_W;
+            *k_id = KEY_W;
         } break;
         case XK_a: {
-            k_id = KEY_A;
+            *k_id = KEY_A;
         } break;
         case XK_s: {
-            k_id = KEY_S;
+            *k_id = KEY_S;
         } break;
         case XK_d: {
-            k_id = KEY_D;
+            *k_id = KEY_D;
+        } break;
+        case XK_r: {
+            *k_id = KEY_R;
         } break;
         default:
             LOG_WARNING("Unknown X11 key: %lx\n", key);
-            return;
+            return STATUS_FAILURE;
+    }
+    return STATUS_SUCCESS;
+}
+
+static void press_key(KeySym key)
+{
+    key_id k_id;
+    if(convert_x11_key(key, &k_id) == STATUS_FAILURE) {
+        return;
     }
 
     if(!keys[k_id].held) {
@@ -193,28 +204,8 @@ static void press_key(KeySym key)
 static void release_key(KeySym key)
 {
     key_id k_id;
-    switch(key) {
-        case XK_Escape: {
-            k_id = KEY_ESC;
-        } break;
-        case XK_space: {
-            k_id = KEY_SPACE;
-        } break;
-        case XK_w: {
-            k_id = KEY_W;
-        } break;
-        case XK_a: {
-            k_id = KEY_A;
-        } break;
-        case XK_s: {
-            k_id = KEY_S;
-        } break;
-        case XK_d: {
-            k_id = KEY_D;
-        } break;
-        default:
-            LOG_WARNING("Unknown X11 key: %lx\n", key);
-            return;
+    if(convert_x11_key(key, &k_id) == STATUS_FAILURE) {
+        return;
     }
 
     keys[k_id].held = false;

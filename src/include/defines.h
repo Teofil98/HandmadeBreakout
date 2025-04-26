@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 
+// TODO: Convert to uint8
 #define UNUSED(x) (void)x
 #define RGBA_ALPHA(x) ((uint8_t)x << 24)
 #define RGBA_RED(x) ((uint8_t)x << 16)
@@ -22,6 +23,8 @@
 
 #define PI 3.14159265359
 
+#define STATUS_SUCCESS 0
+#define STATUS_FAILURE -1
 
 using uint64  = uint64_t;
 using uint32  = uint32_t;
@@ -33,3 +36,4 @@ using int16   = int16_t;
 using int8    = int8_t;
 using float32 = float;
 using float64 = double;
+using status  = int32;

@@ -321,6 +321,17 @@ static void collide_user_proj(void)
     }
 }
 
+static void collide_alien_proj(void)
+{
+    for(uint64 i = 0; i < g_aliens_projectiles.get_size(); i++) {
+        if(g_aliens_projectiles[i].version
+               == entity_id_array[g_aliens_projectiles[i].index].version
+           && collide(g_spaceship_id, g_aliens_projectiles[i])) {
+            g_player_dead = true;
+        }
+    }
+}
+
 static void check_collisions(void)
 {
     uint64 key = BBOX_COMP;
@@ -339,6 +350,10 @@ static void check_collisions(void)
        && g_spaceship_projectile.version
               == entity_id_array[g_spaceship_projectile.index].version) {
         collide_user_proj();
+    }
+
+    if(g_aliens_projectiles.get_size() > 0) {
+        collide_alien_proj();
     }
 }
 
@@ -513,18 +528,13 @@ static bool player_won(void)
 
 static bool player_lost(void)
 {
-    return false;
-}
-
-static void reset_game_state(void)
-{
-    printf("Reset state\n");
+    return g_player_dead;
 }
 
 static entity_id get_alien_to_shoot(void)
 {
-    for(int32 i = 0; i < ALIENS_ROWS; i++) {
-        for(int32 j = ALIENS_COLS - 1; j >= 0; j--) {
+        for(int32 j = 0; j < ALIENS_COLS; j++) {
+    for(int32 i = ALIENS_ROWS - 1; i >= 0; i--) {
             if(g_aliens[i * ALIENS_COLS + j].version
                == entity_id_array[g_aliens[i * ALIENS_COLS + j].index].version) {
                 return g_aliens[i * ALIENS_COLS + j];
@@ -532,6 +542,7 @@ static entity_id get_alien_to_shoot(void)
         }
     }
     // should never happen under current configuration
+    // TODO: Put newline automagically
     ASSERT(false, "Current assumption: If all aliens are dead, game is won");
     return {0,0};
 }
@@ -559,7 +570,7 @@ static void generate_alien_projectile(float64 delta,
 
             entity_id alien_to_shoot = get_alien_to_shoot();
 
-            uint32 proj_row = positions[alien_to_shoot.index].y + 1;
+            uint32 proj_row = positions[alien_to_shoot.index].y + 2;
             uint32 proj_col = positions[alien_to_shoot.index].x
                               + sprites[alien_to_shoot.index].width / 2;
 
@@ -569,6 +580,20 @@ static void generate_alien_projectile(float64 delta,
 
         *alien_projectile_timer = g_alien_projectile_frequency;
     }
+}
+
+static void reset_game_state(void)
+{
+    g_player_dead = false;
+    //delete all entities
+    for(uint64 i = 0; i < MAX_ENTITIES; i++) {
+        if(entity_in_use[i]) {
+            delete_entity_id(entity_id_array[i]);
+        }
+    }
+
+    g_spaceship_id = create_spaceship();
+    create_alien_matrix();
 }
 
 void game_main(void)

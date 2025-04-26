@@ -77,6 +77,8 @@ static float32 g_spaceship_speed = 30;
 static int32 g_projectile_speed = -60;
 static entity_id g_spaceship_id;
 static my_lib::array<entity_id, ALIENS_ROWS * ALIENS_COLS> g_aliens;
+static my_lib::array<entity_id, 1> g_aliens_projectiles;
+static float64 g_alien_projectile_frequency = 1;
 static entity_id g_spaceship_projectile;
 // static entity_id aliens[ALIENS_ROWS * ALIENS_COLS];
 static uint32 g_alien_width = 10;
@@ -101,11 +103,11 @@ static entity_id create_spaceship(void)
     box.width = sprt.width;
     box.height = sprt.height;
 
-    positions[id] = pos;
-    sprites[id] = sprt;
-    bounding_boxes[id] = box;
+    positions[id.index] = pos;
+    sprites[id.index] = sprt;
+    bounding_boxes[id.index] = box;
 
-    components_used[id] = POSITION_COMP | SPRITE_COMP | BBOX_COMP;
+    components_used[id.index] = POSITION_COMP | SPRITE_COMP | BBOX_COMP;
 
     return id;
 }
@@ -128,11 +130,11 @@ static entity_id create_alien(const uint32 row, const uint32 col)
     box.width = sprt.width;
     box.height = sprt.height;
 
-    positions[id] = pos;
-    sprites[id] = sprt;
-    bounding_boxes[id] = box;
+    positions[id.index] = pos;
+    sprites[id.index] = sprt;
+    bounding_boxes[id.index] = box;
 
-    components_used[id] = POSITION_COMP | SPRITE_COMP | BBOX_COMP;
+    components_used[id.index] = POSITION_COMP | SPRITE_COMP | BBOX_COMP;
 
     return id;
 }
@@ -179,12 +181,12 @@ static entity_id create_projectile(const uint32 row, const uint32 col,
     dir.x = dir_x;
     dir.y = dir_y;
 
-    positions[id] = pos;
-    sprites[id] = sprt;
-    bounding_boxes[id] = box;
-    directions[id] = dir;
+    positions[id.index] = pos;
+    sprites[id.index] = sprt;
+    bounding_boxes[id.index] = box;
+    directions[id.index] = dir;
 
-    components_used[id] = POSITION_COMP | SPRITE_COMP | BBOX_COMP
+    components_used[id.index] = POSITION_COMP | SPRITE_COMP | BBOX_COMP
                           | DIRECTION_COMP;
 
     return id;
@@ -217,12 +219,12 @@ static void draw_pixel(platform_backbuffer* backbuffer, const uint32 row,
 
 static void draw_sprite(const entity_id id, platform_backbuffer* backbuffer)
 {
-    uint32 height = sprites[id].height;
-    uint32 width = sprites[id].width;
-    const uint8* sprite = sprites[id].sprite;
-    uint32 color = sprites[id].color;
-    uint32 entity_row = (uint32)positions[id].y;
-    uint32 entity_col = (uint32)positions[id].x;
+    uint32 height = sprites[id.index].height;
+    uint32 width = sprites[id.index].width;
+    const uint8* sprite = sprites[id.index].sprite;
+    uint32 color = sprites[id.index].color;
+    uint32 entity_row = (uint32)positions[id.index].y;
+    uint32 entity_col = (uint32)positions[id.index].x;
 
     for(uint32 i = 0; i < height; i++) {
         for(uint32 j = 0; j < width; j++) {
@@ -235,19 +237,20 @@ static void draw_sprite(const entity_id id, platform_backbuffer* backbuffer)
 
 static void draw_sprites(platform_backbuffer* backbuffer)
 {
-    for(entity_id i = 0; i < MAX_ENTITIES; i++) {
-        if(entity_in_use[i]) {
-            draw_sprite(i, backbuffer);
+    for(uint64 i = 0; i < MAX_ENTITIES; i++) {
+        entity_id id = entity_id_array[i];
+        if(entity_in_use[id.index]) {
+            draw_sprite(id, backbuffer);
         }
     }
 }
 
 static bool out_of_bounds(entity_id id)
 {
-    position_component top_left = positions[id];
+    position_component top_left = positions[id.index];
     position_component bottom_right;
-    bottom_right.x = positions[id].x + bounding_boxes[id].width - 1;
-    bottom_right.y = positions[id].y + bounding_boxes[id].height - 1;
+    bottom_right.x = positions[id.index].x + bounding_boxes[id.index].width - 1;
+    bottom_right.y = positions[id.index].y + bounding_boxes[id.index].height - 1;
 
     // check out of bounds with the top
     if(top_left.y < 0) {
@@ -275,20 +278,20 @@ static bool out_of_bounds(entity_id id)
 static bool collide(entity_id obj1, entity_id obj2)
 {
     uint64 key = BBOX_COMP | POSITION_COMP;
-    ASSERT((components_used[obj1] & key) == key,
+    ASSERT((components_used[obj1.index] & key) == key,
            "Trying to perform collisions on an object that has no bounding box "
            "or position! (first object in collision - entity_id: %ld)\n",
            obj1);
-    ASSERT((components_used[obj2] & key) == key,
+    ASSERT((components_used[obj2.index] & key) == key,
            "Trying to perform collisions on an object that has no bounding box "
            "or position! (second object in collision - entity_id: %ld)\n",
            obj2);
 
-    bounding_box_component bbox1 = bounding_boxes[obj1];
-    bounding_box_component bbox2 = bounding_boxes[obj2];
+    bounding_box_component bbox1 = bounding_boxes[obj1.index];
+    bounding_box_component bbox2 = bounding_boxes[obj2.index];
 
-    position_component pos1 = positions[obj1];
-    position_component pos2 = positions[obj2];
+    position_component pos1 = positions[obj1.index];
+    position_component pos2 = positions[obj2.index];
 
     // check if there are collisions on both X and Y axes since we are using
     // AABB
@@ -303,12 +306,15 @@ static void collide_user_proj(void)
     uint64 curr_alien = 0;
 
     while(curr_alien < g_aliens.get_size()) {
-        if(collide(g_spaceship_projectile, g_aliens[curr_alien])) {
+        if(g_aliens[curr_alien].version
+               == entity_id_array[g_aliens[curr_alien].index].version
+           && collide(g_spaceship_projectile, g_aliens[curr_alien])) {
             delete_entity_id(g_aliens[curr_alien]);
-            g_aliens[curr_alien] = INVALID_ENTITY;
             delete_entity_id(g_spaceship_projectile);
-            g_spaceship_projectile = INVALID_ENTITY;
-            g_aliens.delete_idx_fast(curr_alien);
+            // TODO: find better solution, eventually the value will overflow back here
+            // Don't delete alien, instead, keep it in matrix to
+            // mark that it is dead
+            // g_aliens.delete_idx_fast(curr_alien);
             break;
         }
         curr_alien++;
@@ -319,18 +325,19 @@ static void check_collisions(void)
 {
     uint64 key = BBOX_COMP;
     // check out of bounds objects
-    for(entity_id id = 0; id < MAX_ENTITIES; id++) {
-        if(entity_in_use[id] && ((components_used[id] & key) == key)) {
+    for(uint64 i = 0; i < MAX_ENTITIES; i++) {
+        entity_id id = entity_id_array[i];
+        if(entity_in_use[id.index]
+           && ((components_used[id.index] & key) == key)) {
             if(out_of_bounds(id)) {
                 delete_entity_id(id);
-                if(id == g_spaceship_projectile) {
-                    g_spaceship_projectile = INVALID_ENTITY;
-                }
             }
         }
     }
 
-    if(entity_in_use[g_spaceship_projectile]) {
+    if(entity_in_use[g_spaceship_projectile.index]
+       && g_spaceship_projectile.version
+              == entity_id_array[g_spaceship_projectile.index].version) {
         collide_user_proj();
     }
 }
@@ -339,10 +346,12 @@ static void update_entity_positions(float64 delta)
 {
     uint64 key = POSITION_COMP | DIRECTION_COMP;
 
-    for(entity_id id = 0; id < MAX_ENTITIES; id++) {
-        if(entity_in_use[id] && ((components_used[id] & key) == key)) {
-            positions[id].x += (directions[id].x * delta);
-            positions[id].y += (directions[id].y * delta);
+    for(uint64 i = 0; i < MAX_ENTITIES; i++) {
+        entity_id id = entity_id_array[i];
+        if(entity_in_use[id.index]
+           && ((components_used[id.index] & key) == key)) {
+            positions[id.index].x += (directions[id.index].x * delta);
+            positions[id.index].y += (directions[id.index].y * delta);
         }
     }
 }
@@ -452,24 +461,30 @@ void game_destroy(void)
 
 void process_input(float64 delta)
 {
-    position_component old_position = positions[g_spaceship_id];
+    position_component old_position = positions[g_spaceship_id.index];
     if(keys[KEY_A].held) {
-        positions[g_spaceship_id].x -= delta * g_spaceship_speed;
+        positions[g_spaceship_id.index].x -= delta * g_spaceship_speed;
     } else if(keys[KEY_D].held) {
-        positions[g_spaceship_id].x += delta * g_spaceship_speed;
+        positions[g_spaceship_id.index].x += delta * g_spaceship_speed;
     }
 
     if(keys[KEY_SPACE].pressed) {
-        uint32 proj_row = positions[g_spaceship_id].y - 1;
-        uint32 proj_col = positions[g_spaceship_id].x
-                          + sprites[g_spaceship_id].width / 2;
-        if(g_spaceship_projectile == INVALID_ENTITY) {
-            g_spaceship_projectile = create_projectile(proj_row, proj_col, 0, g_projectile_speed);
+        uint32 proj_row = positions[g_spaceship_id.index].y - 1;
+        uint32 proj_col = positions[g_spaceship_id.index].x
+                          + sprites[g_spaceship_id.index].width / 2;
+        if(!entity_in_use[g_spaceship_projectile.index]) {
+            g_spaceship_projectile = create_projectile(proj_row, proj_col, 0,
+                                                       g_projectile_speed);
+        } else if(g_spaceship_projectile.version
+                  != entity_id_array[g_spaceship_projectile.index].version) {
+
+            g_spaceship_projectile = create_projectile(proj_row, proj_col, 0,
+                                                       g_projectile_speed);
         }
     }
 
     if(out_of_bounds(g_spaceship_id)) {
-        positions[g_spaceship_id] = old_position;
+        positions[g_spaceship_id.index] = old_position;
     }
 }
 
@@ -487,7 +502,13 @@ static void clear_screen(platform_backbuffer* backbuffer, uint32 color)
 
 static bool player_won(void)
 {
-    return !g_player_dead && g_aliens.get_size() == 0;
+    for(uint64 i = 0; i < g_aliens.get_size(); i++) {
+        if(g_aliens[i].version == entity_id_array[g_aliens[i].index].version) {
+            // alien still alive
+            return false;
+        }
+    }
+    return !g_player_dead;
 }
 
 static bool player_lost(void)
@@ -498,6 +519,56 @@ static bool player_lost(void)
 static void reset_game_state(void)
 {
     printf("Reset state\n");
+}
+
+static entity_id get_alien_to_shoot(void)
+{
+    for(int32 i = 0; i < ALIENS_ROWS; i++) {
+        for(int32 j = ALIENS_COLS - 1; j >= 0; j--) {
+            if(g_aliens[i * ALIENS_COLS + j].version
+               == entity_id_array[g_aliens[i * ALIENS_COLS + j].index].version) {
+                return g_aliens[i * ALIENS_COLS + j];
+            }
+        }
+    }
+    // should never happen under current configuration
+    ASSERT(false, "Current assumption: If all aliens are dead, game is won");
+    return {0,0};
+}
+
+static void generate_alien_projectile(float64 delta,
+                                      float64* alien_projectile_timer)
+{
+
+    // Remove deleted projectiles
+    // NOTE: Really don't like doing it like this
+    uint64 i = 0;
+    while(i < g_aliens_projectiles.get_size()) {
+        if(g_aliens_projectiles[i].version
+           != entity_id_array[g_aliens_projectiles[i].index].version) {
+            g_aliens_projectiles.delete_idx_fast(i);
+            continue;
+        }
+        i++;
+    }
+
+    *alien_projectile_timer -= delta;
+    if(*alien_projectile_timer < 0) {
+        if(g_aliens_projectiles.get_size()
+           < g_aliens_projectiles.get_capacity()) {
+
+            entity_id alien_to_shoot = get_alien_to_shoot();
+
+            uint32 proj_row = positions[alien_to_shoot.index].y + 1;
+            uint32 proj_col = positions[alien_to_shoot.index].x
+                              + sprites[alien_to_shoot.index].width / 2;
+
+            g_aliens_projectiles.add(
+                create_projectile(proj_row, proj_col, 0, -g_projectile_speed));
+        }
+
+        *alien_projectile_timer = g_alien_projectile_frequency;
+    }
 }
 
 void game_main(void)
@@ -514,6 +585,7 @@ void game_main(void)
     g_spaceship_id = create_spaceship();
     create_alien_matrix();
     float64 avg_fps = 0;
+    float64 alien_projectile_timer = g_alien_projectile_frequency;
     while(!keys[KEY_ESC].pressed) {
 
         // reset game state if R is pressed
@@ -540,6 +612,7 @@ void game_main(void)
         poll_platform_messages();
         process_input(delta);
         update_entity_positions(delta);
+        generate_alien_projectile(delta, &alien_projectile_timer);
         check_collisions();
         draw_sprites(g_backbuffer);
         display_backbuffer(g_backbuffer, g_window);

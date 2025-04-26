@@ -51,6 +51,11 @@ public:
         return size;
     }
 
+    uint64 get_capacity()
+    {
+        return N;
+    }
+
 private:
     T elements[N];
     uint64 size;

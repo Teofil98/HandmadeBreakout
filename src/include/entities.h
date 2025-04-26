@@ -4,9 +4,13 @@
 #include "defines.h"
 
 #define MAX_ENTITIES 100
-#define INVALID_ENTITY 0
 
-using entity_id = uint64;
+struct entity_id {
+    uint64 index : 52;
+    uint64 version : 12;
+};
+
+extern entity_id entity_id_array[MAX_ENTITIES];
 
 extern position_component positions[MAX_ENTITIES];
 extern sprite_component sprites[MAX_ENTITIES];

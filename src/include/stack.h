@@ -36,7 +36,7 @@ template <typename T, uint64 N> void stack<T, N>::push(T val)
 template <typename T, uint64 N> T stack<T, N>::pop()
 {
     ASSERT(top > 0, "Trying to pop empty stack!");
-    int val = data[top - 1];
+    T val = data[top - 1];
     top--;
     return val;
 }

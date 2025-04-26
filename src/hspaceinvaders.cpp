@@ -81,6 +81,7 @@ static entity_id g_spaceship_projectile;
 // static entity_id aliens[ALIENS_ROWS * ALIENS_COLS];
 static uint32 g_alien_width = 10;
 static uint32 g_alien_height = 8;
+static bool g_player_dead = false;
 
 static entity_id create_spaceship(void)
 {
@@ -309,9 +310,8 @@ static void collide_user_proj(void)
             g_spaceship_projectile = INVALID_ENTITY;
             g_aliens.delete_idx_fast(curr_alien);
             break;
-        } else {
-            curr_alien++;
         }
+        curr_alien++;
     }
 }
 
@@ -485,6 +485,21 @@ static void clear_screen(platform_backbuffer* backbuffer)
     }
 }
 
+static bool player_won(void)
+{
+    return !g_player_dead && g_aliens.get_size() == 0;
+}
+
+static bool player_lost(void)
+{
+    return false;
+}
+
+static void reset_game_state(void)
+{
+    printf("Reset state\n");
+}
+
 void game_main(void)
 {
     game_init(128, 128, 8);
@@ -500,6 +515,20 @@ void game_main(void)
     create_alien_matrix();
     float64 avg_fps = 0;
     while(!keys[KEY_ESC].pressed) {
+
+        // reset game state if R is pressed
+        if(keys[KEY_R].pressed) {
+            reset_game_state();
+        }
+
+        // check if the game has ended
+        if(player_won()) {
+            printf("Game won!\n");
+
+        } else if(player_lost()) {
+            printf("Game lost!\n");
+        }
+
         clear_screen(g_backbuffer);
         poll_platform_messages();
         process_input(delta);

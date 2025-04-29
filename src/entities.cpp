@@ -41,3 +41,8 @@ void delete_entity_id(entity_id id)
     entity_id_array[id.index].version++;
     available_entity_ids.push(id);
 }
+
+bool entity_valid(entity_id id)
+{
+    return id.version == entity_id_array[id.index].version;
+}

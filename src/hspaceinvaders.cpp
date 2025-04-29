@@ -306,8 +306,7 @@ static void collide_user_proj(void)
     uint64 curr_alien = 0;
 
     while(curr_alien < g_aliens.get_size()) {
-        if(g_aliens[curr_alien].version
-               == entity_id_array[g_aliens[curr_alien].index].version
+        if(entity_valid(g_aliens[curr_alien])
            && collide(g_spaceship_projectile, g_aliens[curr_alien])) {
             delete_entity_id(g_aliens[curr_alien]);
             delete_entity_id(g_spaceship_projectile);
@@ -324,8 +323,7 @@ static void collide_user_proj(void)
 static void collide_alien_proj(void)
 {
     for(uint64 i = 0; i < g_aliens_projectiles.get_size(); i++) {
-        if(g_aliens_projectiles[i].version
-               == entity_id_array[g_aliens_projectiles[i].index].version
+        if(entity_valid(g_aliens_projectiles[i])
            && collide(g_spaceship_id, g_aliens_projectiles[i])) {
             g_player_dead = true;
         }
@@ -347,8 +345,7 @@ static void check_collisions(void)
     }
 
     if(entity_in_use[g_spaceship_projectile.index]
-       && g_spaceship_projectile.version
-              == entity_id_array[g_spaceship_projectile.index].version) {
+       && entity_valid(g_spaceship_projectile)) {
         collide_user_proj();
     }
 
@@ -490,8 +487,7 @@ void process_input(float64 delta)
         if(!entity_in_use[g_spaceship_projectile.index]) {
             g_spaceship_projectile = create_projectile(proj_row, proj_col, 0,
                                                        g_projectile_speed);
-        } else if(g_spaceship_projectile.version
-                  != entity_id_array[g_spaceship_projectile.index].version) {
+        } else if(!entity_valid(g_spaceship_projectile)) {
 
             g_spaceship_projectile = create_projectile(proj_row, proj_col, 0,
                                                        g_projectile_speed);
@@ -518,7 +514,7 @@ static void clear_screen(platform_backbuffer* backbuffer, uint32 color)
 static bool player_won(void)
 {
     for(uint64 i = 0; i < g_aliens.get_size(); i++) {
-        if(g_aliens[i].version == entity_id_array[g_aliens[i].index].version) {
+        if(entity_valid(g_aliens[i])) {
             // alien still alive
             return false;
         }
@@ -535,8 +531,7 @@ static entity_id get_alien_to_shoot(void)
 {
         for(int32 j = 0; j < ALIENS_COLS; j++) {
     for(int32 i = ALIENS_ROWS - 1; i >= 0; i--) {
-            if(g_aliens[i * ALIENS_COLS + j].version
-               == entity_id_array[g_aliens[i * ALIENS_COLS + j].index].version) {
+            if(entity_valid(g_aliens[i * ALIENS_COLS + j])) {
                 return g_aliens[i * ALIENS_COLS + j];
             }
         }
@@ -555,8 +550,7 @@ static void generate_alien_projectile(float64 delta,
     // NOTE: Really don't like doing it like this
     uint64 i = 0;
     while(i < g_aliens_projectiles.get_size()) {
-        if(g_aliens_projectiles[i].version
-           != entity_id_array[g_aliens_projectiles[i].index].version) {
+        if(!entity_valid(g_aliens_projectiles[i])) {
             g_aliens_projectiles.delete_idx_fast(i);
             continue;
         }

@@ -14,6 +14,7 @@
 #define ALIENS_ROWS 4
 #define ALIENS_COLS 6
 #define SEED 12345
+#define MAX_ALIEN_PROJECTILES 3
 
 struct screen_information {
 
@@ -79,7 +80,7 @@ static float32 g_spaceship_speed = 30;
 static int32 g_projectile_speed = -60;
 static entity_id g_spaceship_id;
 static my_lib::array<entity_id, ALIENS_ROWS * ALIENS_COLS> g_aliens;
-static my_lib::array<entity_id, 1> g_aliens_projectiles;
+static my_lib::array<entity_id, MAX_ALIEN_PROJECTILES> g_aliens_projectiles;
 static float64 g_alien_projectile_frequency = 1;
 static entity_id g_spaceship_projectile;
 // static entity_id aliens[ALIENS_ROWS * ALIENS_COLS];
@@ -534,17 +535,30 @@ static bool player_lost(void)
 
 static entity_id get_alien_to_shoot(void)
 {
-        for(int32 j = 0; j < ALIENS_COLS; j++) {
-    for(int32 i = ALIENS_ROWS - 1; i >= 0; i--) {
+    // Aliens on the last non-empty row
+    // They have a clear line-of-sight to shoot
+    entity_id visible_aliens[ALIENS_COLS];
+    int32 nb_visible_aliens = 0;
+    for(int32 j = 0; j < ALIENS_COLS; j++) {
+        for(int32 i = ALIENS_ROWS - 1; i >= 0; i--) {
             if(entity_valid(g_aliens[i * ALIENS_COLS + j])) {
-                return g_aliens[i * ALIENS_COLS + j];
+                visible_aliens[nb_visible_aliens] = g_aliens[i * ALIENS_COLS + j];
+                nb_visible_aliens++;
+                break;
             }
         }
     }
-    // should never happen under current configuration
-    // TODO: Put newline automagically
-    ASSERT(false, "Current assumption: If all aliens are dead, game is won");
-    return {0,0};
+
+    if(nb_visible_aliens == 0) {
+        // should never happen under current configuration
+        // TODO: Put newline automagically in assert macro
+        ASSERT(false,
+               "Current assumption: If all aliens are dead, game is won");
+        return { 0, 0 };
+    }
+
+    int32 idx = rng.rand_int32(0, nb_visible_aliens - 1);
+    return visible_aliens[idx];
 }
 
 static void generate_alien_projectile(float64 delta,

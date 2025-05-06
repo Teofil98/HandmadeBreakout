@@ -5,6 +5,7 @@
 #include "include/logging.h"
 #include "include/platform_layer.h"
 #include "include/array.h"
+#include "include/rand.h"
 #include <math.h> // TODO: replace functions here with own implementation
 
 // GENERAL TODO: Check all return values of all functions and log errors where
@@ -12,6 +13,7 @@
 
 #define ALIENS_ROWS 4
 #define ALIENS_COLS 6
+#define SEED 12345
 
 struct screen_information {
 
@@ -84,6 +86,7 @@ static entity_id g_spaceship_projectile;
 static uint32 g_alien_width = 10;
 static uint32 g_alien_height = 8;
 static bool g_player_dead = false;
+static random_number_generator rng;
 
 static entity_id create_spaceship(void)
 {
@@ -456,6 +459,8 @@ void game_init(const uint32 width_in_pixels, const uint32 height_in_pixels,
         get_frames_from_time_sec(1.0f, nb_samples_per_sec));
     init_input();
     init_entity_system();
+    rng.init_seed32(SEED);
+
     LOG_TRACE("Game init done\n");
 }
 

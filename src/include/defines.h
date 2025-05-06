@@ -29,6 +29,8 @@
 #define STATUS_SUCCESS 0
 #define STATUS_FAILURE -1
 
+#define UINT32_MAXIMUM 0xFFFFFFFF
+
 using uint64  = uint64_t;
 using uint32  = uint32_t;
 using uint16  = uint16_t;

@@ -6,8 +6,8 @@
 #define MAX_ENTITIES 100
 
 struct entity_id {
-    uint64 index : 52;
-    uint64 version : 12;
+    uint64 index : 32;
+    uint64 version : 32;
 };
 
 extern entity_id entity_id_array[MAX_ENTITIES];

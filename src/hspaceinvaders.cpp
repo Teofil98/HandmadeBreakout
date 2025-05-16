@@ -613,10 +613,12 @@ static void generate_alien_projectile(float64 delta,
     }
 }
 
-static void reset_game_state(void)
+static void reset_game_state(float64* delta, float64* curr_time)
 {
     g_player_dead = false;
     g_next_alien_collision_side_left = true;
+    *delta = 0;
+    *curr_time = get_time_ms();
     //delete all entities
     for(uint64 i = 0; i < MAX_ENTITIES; i++) {
         if(entity_in_use[i]) {
@@ -691,7 +693,7 @@ void game_main(void)
 
         // reset game state if R is pressed
         if(keys[KEY_R].pressed) {
-            reset_game_state();
+            reset_game_state(&delta, &last_measurement);
         }
 
         // check if the game has ended

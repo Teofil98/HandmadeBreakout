@@ -351,6 +351,15 @@ static void collide_alien_proj(void)
     }
 }
 
+static void collide_aliens_with_spaceship(void)
+{
+    for(uint64 i = 0; i < g_aliens.get_size(); i++) {
+        if(collide(g_spaceship_id, g_aliens[i])) {
+            g_player_dead = true;
+        }
+    }
+}
+
 static void check_collisions(void)
 {
     uint64 key = BBOX_COMP;
@@ -374,6 +383,8 @@ static void check_collisions(void)
     if(g_aliens_projectiles.get_size() > 0) {
         collide_alien_proj();
     }
+
+    collide_aliens_with_spaceship();
 }
 
 static void update_entity_positions(float64 delta)

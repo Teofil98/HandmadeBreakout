@@ -77,13 +77,18 @@ static const uint8 projectile_bytes[] = {
     "*"
 };
 
+// TODO: Refactor in function that initializez to initial state
+// and use same function in the reset
 static float32 g_spaceship_speed = 30;
 static int32 g_projectile_speed = -60;
-static int32 g_alien_speed = 30;
+static int32 g_alien_speed = INITIAL_ALIEN_SPEED;
+static int32 g_alien_speed_increment = 15;
+static int32 g_dead_aliens = 0;
 static entity_id g_spaceship_id;
 static my_lib::array<entity_id, ALIENS_ROWS * ALIENS_COLS> g_aliens;
 static my_lib::array<entity_id, MAX_ALIEN_PROJECTILES> g_aliens_projectiles;
-static float64 g_alien_projectile_frequency = 1;
+static float64 g_alien_projectile_frequency = INITIAL_PROJECTILE_FREQ;
+static float64 g_alien_projectile_frequency_decrement = 0.5;
 static bool g_next_alien_collision_side_left = false;
 static entity_id g_spaceship_projectile;
 // static entity_id aliens[ALIENS_ROWS * ALIENS_COLS];
@@ -322,6 +327,17 @@ static bool collide(entity_id obj1, entity_id obj2)
             && pos2.y + bbox2.height >= pos1.y);
 }
 
+static void update_alien_speeds(void)
+{
+    for(uint64 i = 0; i < g_aliens.get_size(); i++) {
+        if(!entity_valid(g_aliens[i])) {
+            continue;
+        }
+        int8 sign = my_lib::signof(directions[g_aliens[i].index].x);
+        directions[g_aliens[i].index].x = sign * g_alien_speed;
+    }
+}
+
 static void collide_user_proj(void)
 {
     uint64 curr_alien = 0;
@@ -331,10 +347,20 @@ static void collide_user_proj(void)
            && collide(g_spaceship_projectile, g_aliens[curr_alien])) {
             delete_entity_id(g_aliens[curr_alien]);
             delete_entity_id(g_spaceship_projectile);
-            // TODO: find better solution, eventually the value will overflow back here
-            // Don't delete alien, instead, keep it in matrix to
-            // mark that it is dead
-            // g_aliens.delete_idx_fast(curr_alien);
+            g_dead_aliens++;
+            if(g_dead_aliens == ALIENS_COLS) {
+                printf("Increasing speed\n");
+                g_dead_aliens = 0;
+                g_alien_speed += g_alien_speed_increment;
+                update_alien_speeds();
+                g_alien_projectile_frequency
+                    -= g_alien_projectile_frequency_decrement;
+                g_alien_projectile_frequency = my_lib::max<float64>(
+                    g_alien_projectile_frequency, 1);
+            }
+            // TODO: find better solution, eventually the value will overflow
+            // back here Don't delete alien, instead, keep it in matrix to mark
+            // that it is dead g_aliens.delete_idx_fast(curr_alien);
             break;
         }
         curr_alien++;
@@ -631,6 +657,9 @@ static void reset_game_state(float64* delta, float64* curr_time)
     g_next_alien_collision_side_left = false;
     *delta = 0;
     *curr_time = get_time_ms();
+    g_dead_aliens = 0;
+    g_alien_speed = INITIAL_ALIEN_SPEED;
+    g_alien_projectile_frequency = INITIAL_PROJECTILE_FREQ;
     //delete all entities
     for(uint64 i = 0; i < MAX_ENTITIES; i++) {
         if(entity_in_use[i]) {

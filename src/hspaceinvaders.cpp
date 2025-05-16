@@ -16,6 +16,8 @@
 #define ALIENS_COLS 6
 #define SEED 12345
 #define MAX_ALIEN_PROJECTILES 3
+#define INITIAL_PROJECTILE_FREQ 2
+#define INITIAL_ALIEN_SPEED 15
 
 struct screen_information {
 
@@ -97,13 +99,16 @@ static const uint32 g_alien_height = 8;
 static bool g_player_dead = false;
 static random_number_generator rng;
 
+// TODO: Crearly separate in different layers
+// functions that use pixels in screen space
+// vs in game space
 static entity_id create_spaceship(void)
 {
     entity_id id = get_new_entity_id();
 
     position_component pos;
-    pos.x = 64;
-    pos.y = 100;
+    pos.x = g_screen_info->width_in_pixels/2;
+    pos.y = g_screen_info->height_in_pixels - 10;
 
     sprite_component sprt;
     sprt.color = COLOR_WHITE;
@@ -716,10 +721,7 @@ static void update_alien_positions(void)
 // and remove all other explicit dead alien checks from code
 void game_main(void)
 {
-    game_init(128, 128, 8);
-    // Used for gradient animation
-    int32 xoffset = 0;
-    int32 yoffset = 0;
+    game_init(128, 130, 8);
     write_sin_wave(g_sound_buffer, 300, 1600);
     play_sound_buffer(g_sound_buffer);
     float64 last_measurement = get_time_ms();

@@ -82,6 +82,7 @@ static entity_id g_spaceship_id;
 static my_lib::array<entity_id, ALIENS_ROWS * ALIENS_COLS> g_aliens;
 static my_lib::array<entity_id, MAX_ALIEN_PROJECTILES> g_aliens_projectiles;
 static float64 g_alien_projectile_frequency = 1;
+static bool g_next_alien_collision_side_left = true;
 static entity_id g_spaceship_projectile;
 // static entity_id aliens[ALIENS_ROWS * ALIENS_COLS];
 static uint32 g_alien_width = 10;
@@ -130,15 +131,22 @@ static entity_id create_alien(const uint32 row, const uint32 col)
     sprt.width = g_alien_width;
     sprt.height = g_alien_height;
 
+    // TODO: Refactor components. Add a function to add a new component to an index.
     bounding_box_component box;
     box.width = sprt.width;
     box.height = sprt.height;
 
+    direction_component direction;
+    // TODO: Change to something else
+    direction.x = g_projectile_speed;
+    direction.y = 0;
+
     positions[id.index] = pos;
     sprites[id.index] = sprt;
     bounding_boxes[id.index] = box;
+    directions[id.index] = direction;
 
-    components_used[id.index] = POSITION_COMP | SPRITE_COMP | BBOX_COMP;
+    components_used[id.index] = POSITION_COMP | SPRITE_COMP | BBOX_COMP | DIRECTION_COMP;
 
     return id;
 }
@@ -249,30 +257,38 @@ static void draw_sprites(platform_backbuffer* backbuffer)
     }
 }
 
-static bool out_of_bounds(entity_id id)
+static bool out_of_bounds(entity_id id, float32 left_lim, float32 right_lim,
+                          float32 top_lim, float32 bottom_lim)
 {
     position_component top_left = positions[id.index];
     position_component bottom_right;
     bottom_right.x = positions[id.index].x + bounding_boxes[id.index].width - 1;
-    bottom_right.y = positions[id.index].y + bounding_boxes[id.index].height - 1;
+    bottom_right.y = positions[id.index].y + bounding_boxes[id.index].height- 1;
 
     // check out of bounds with the top
-    if(top_left.y < 0) {
+    if(top_left.y < top_lim) {
+        printf("Collided top\n");
         return true;
     }
 
     // check out of bounds with the bottom
-    if(bottom_right.y > g_screen_info->height_in_pixels) {
+    if(bottom_right.y >= bottom_lim) {
+        printf("Collided bottom\n");
         return true;
     }
 
     // check out of bounds with left side
-    if(top_left.x < 0) {
+    if(top_left.x < left_lim) {
+        printf("Collided left\n");
         return true;
     }
 
+    // NOTE: >= because of how arrays work
+    // not sure if this logic should be here or when calling
+
     // check out of bounds with right side
-    if(bottom_right.x > g_screen_info->width_in_pixels) {
+    if(bottom_right.x >= right_lim) {
+        printf("Collided right\n");
         return true;
     }
 
@@ -342,7 +358,8 @@ static void check_collisions(void)
         entity_id id = entity_id_array[i];
         if(entity_in_use[id.index]
            && ((components_used[id.index] & key) == key)) {
-            if(out_of_bounds(id)) {
+            if(out_of_bounds(id, 0, g_screen_info->width_in_pixels, 0,
+                             g_screen_info->height_in_pixels)) {
                 delete_entity_id(id);
             }
         }
@@ -500,7 +517,8 @@ void process_input(float64 delta)
         }
     }
 
-    if(out_of_bounds(g_spaceship_id)) {
+    if(out_of_bounds(g_spaceship_id, 0, g_screen_info->width_in_pixels, 0,
+                     g_screen_info->height_in_pixels)) {
         positions[g_spaceship_id.index] = old_position;
     }
 }
@@ -598,6 +616,7 @@ static void generate_alien_projectile(float64 delta,
 static void reset_game_state(void)
 {
     g_player_dead = false;
+    g_next_alien_collision_side_left = true;
     //delete all entities
     for(uint64 i = 0; i < MAX_ENTITIES; i++) {
         if(entity_in_use[i]) {
@@ -609,6 +628,50 @@ static void reset_game_state(void)
     create_alien_matrix();
 }
 
+static void update_alien_positions(void)
+{
+    bool should_update = false;
+    for(uint64 i = 0; i < g_aliens.get_size(); i++) {
+        if(!entity_valid(g_aliens[i])) {
+            continue;
+        }
+        if(!g_next_alien_collision_side_left) {
+            // collide with right side only
+            // TODO: Find a better way to collide only with one side
+            if(out_of_bounds(g_aliens[i], -1,
+                             g_screen_info->width_in_pixels - 1, -1,
+                             g_screen_info->height_in_pixels + 1)) {
+                g_next_alien_collision_side_left = true;
+                should_update = true;
+                break;
+            }
+        } else {
+            // collide with left side only
+            // TODO: Find a better way to collide only with one side
+            if(out_of_bounds(g_aliens[i], 1, g_screen_info->width_in_pixels + 1,
+                             -1, g_screen_info->height_in_pixels + 1)) {
+                g_next_alien_collision_side_left = false;
+                should_update = true;
+                break;
+            }
+        }
+    }
+
+    if(should_update) {
+        for(uint64 i = 0; i < g_aliens.get_size(); i++) {
+            if(!entity_valid(g_aliens[i])) {
+                continue;
+            }
+            directions[g_aliens[i].index].x *= -1;
+            positions[g_aliens[i].index].y += g_screen_info->pixel_size;
+            //positions[g_aliens[i].index].y += 1;
+        }
+    }
+}
+
+// TODO: Add a "remove_dead_aliens" functions
+// which I would call at the beginning of the loop
+// and remove all other explicit dead alien checks from code
 void game_main(void)
 {
     game_init(128, 128, 8);
@@ -649,6 +712,7 @@ void game_main(void)
         clear_screen(g_backbuffer, COLOR_BLACK);
         poll_platform_messages();
         process_input(delta);
+        update_alien_positions();
         update_entity_positions(delta);
         generate_alien_projectile(delta, &alien_projectile_timer);
         check_collisions();

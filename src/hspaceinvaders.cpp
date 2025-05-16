@@ -6,6 +6,7 @@
 #include "include/platform_layer.h"
 #include "include/array.h"
 #include "include/rand.h"
+#include "include/utils.h"
 #include <math.h> // TODO: replace functions here with own implementation
 
 // GENERAL TODO: Check all return values of all functions and log errors where
@@ -78,11 +79,12 @@ static const uint8 projectile_bytes[] = {
 
 static float32 g_spaceship_speed = 30;
 static int32 g_projectile_speed = -60;
+static int32 g_alien_speed = 30;
 static entity_id g_spaceship_id;
 static my_lib::array<entity_id, ALIENS_ROWS * ALIENS_COLS> g_aliens;
 static my_lib::array<entity_id, MAX_ALIEN_PROJECTILES> g_aliens_projectiles;
 static float64 g_alien_projectile_frequency = 1;
-static bool g_next_alien_collision_side_left = true;
+static bool g_next_alien_collision_side_left = false;
 static entity_id g_spaceship_projectile;
 // static entity_id aliens[ALIENS_ROWS * ALIENS_COLS];
 static const uint32 g_alien_width = 10;
@@ -137,8 +139,7 @@ static entity_id create_alien(const uint32 row, const uint32 col)
     box.height = sprt.height;
 
     direction_component direction;
-    // TODO: Change to something else
-    direction.x = g_projectile_speed;
+    direction.x = g_alien_speed;
     direction.y = 0;
 
     positions[id.index] = pos;
@@ -616,7 +617,7 @@ static void generate_alien_projectile(float64 delta,
 static void reset_game_state(float64* delta, float64* curr_time)
 {
     g_player_dead = false;
-    g_next_alien_collision_side_left = true;
+    g_next_alien_collision_side_left = false;
     *delta = 0;
     *curr_time = get_time_ms();
     //delete all entities
@@ -665,8 +666,7 @@ static void update_alien_positions(void)
                 continue;
             }
             directions[g_aliens[i].index].x *= -1;
-            positions[g_aliens[i].index].y += g_screen_info->pixel_size;
-            //positions[g_aliens[i].index].y += 1;
+            positions[g_aliens[i].index].y += my_lib::max<uint32>(g_screen_info->pixel_size/2, 1);
         }
     }
 }

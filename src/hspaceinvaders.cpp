@@ -354,7 +354,7 @@ static void collide_alien_proj(void)
 static void collide_aliens_with_spaceship(void)
 {
     for(uint64 i = 0; i < g_aliens.get_size(); i++) {
-        if(collide(g_spaceship_id, g_aliens[i])) {
+        if(entity_valid(g_aliens[i]) && collide(g_spaceship_id, g_aliens[i])) {
             g_player_dead = true;
         }
     }

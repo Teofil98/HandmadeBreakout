@@ -85,8 +85,8 @@ static float64 g_alien_projectile_frequency = 1;
 static bool g_next_alien_collision_side_left = true;
 static entity_id g_spaceship_projectile;
 // static entity_id aliens[ALIENS_ROWS * ALIENS_COLS];
-static uint32 g_alien_width = 10;
-static uint32 g_alien_height = 8;
+static const uint32 g_alien_width = 10;
+static const uint32 g_alien_height = 8;
 static bool g_player_dead = false;
 static random_number_generator rng;
 
@@ -154,8 +154,8 @@ static entity_id create_alien(const uint32 row, const uint32 col)
 
 static void create_alien_matrix(void)
 {
-    const uint32 initial_col = 2;
-    const uint32 initial_row = 2;
+    const uint32 initial_col = 3;
+    const uint32 initial_row = 3;
     uint32 row_space = 0;
     g_aliens.resize(ALIENS_ROWS * ALIENS_COLS);
     for(uint32 i = 0; i < ALIENS_ROWS; i++) {
@@ -459,7 +459,7 @@ void game_init(const uint32 width_in_pixels, const uint32 height_in_pixels,
 {
     LOG_TRACE("Game init\n");
 
-    uint32_t bytes_per_pixel = 4;
+    const uint32_t bytes_per_pixel = 4;
 
     g_screen_info = new screen_information(width_in_pixels, height_in_pixels,
                                            pixel_size);

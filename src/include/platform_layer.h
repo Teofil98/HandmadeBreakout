@@ -40,7 +40,7 @@ void display_backbuffer(const platform_backbuffer* backbuffer, const platform_wi
 
 // TODO: Do I want separate init and create buffer functions?
 // TODO: Init should probably return an error if it fails
-void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec, const uint8 bits_per_sample);
+void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec, const uint8 bits_per_sample, const char* name);
 platform_sound_buffer* create_sound_buffer(const uint32 size_frames);
 void destroy_sound_buffer(platform_sound_buffer* sound_buffer);
 void play_sound_buffer(platform_sound_buffer* sound_buffer);

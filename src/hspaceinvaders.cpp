@@ -514,7 +514,7 @@ void game_init(const uint32 width_in_pixels, const uint32 height_in_pixels,
     const uint8 channels = 2;
     const uint32 nb_samples_per_sec = 44100;
     const uint8 bits_per_sample = 16;
-    init_sound(channels, nb_samples_per_sec, bits_per_sample);
+    init_sound(channels, nb_samples_per_sec, bits_per_sample, WINDOW_TITLE);
     // FIXME: No output for 1 second
     g_sound_buffer = create_sound_buffer(
         get_frames_from_time_sec(1.0f, nb_samples_per_sec));

@@ -97,6 +97,10 @@ static entity_id g_spaceship_projectile;
 static const uint32 g_alien_width = 10;
 static const uint32 g_alien_height = 8;
 static bool g_player_dead = false;
+static platform_window* g_window;
+static platform_backbuffer* g_backbuffer;
+static platform_sound_buffer* g_sound_buffer_shoot;
+static platform_sound_buffer* g_sound_buffer_kill;
 static random_number_generator rng;
 
 // TODO: Crearly separate in different layers
@@ -278,19 +282,16 @@ static bool out_of_bounds(entity_id id, float32 left_lim, float32 right_lim,
 
     // check out of bounds with the top
     if(top_left.y < top_lim) {
-        printf("Collided top\n");
         return true;
     }
 
     // check out of bounds with the bottom
     if(bottom_right.y >= bottom_lim) {
-        printf("Collided bottom\n");
         return true;
     }
 
     // check out of bounds with left side
     if(top_left.x < left_lim) {
-        printf("Collided left\n");
         return true;
     }
 
@@ -299,7 +300,6 @@ static bool out_of_bounds(entity_id id, float32 left_lim, float32 right_lim,
 
     // check out of bounds with right side
     if(bottom_right.x >= right_lim) {
-        printf("Collided right\n");
         return true;
     }
 
@@ -352,9 +352,9 @@ static void collide_user_proj(void)
            && collide(g_spaceship_projectile, g_aliens[curr_alien])) {
             delete_entity_id(g_aliens[curr_alien]);
             delete_entity_id(g_spaceship_projectile);
+            play_sound_buffer(g_sound_buffer_kill);
             g_dead_aliens++;
             if(g_dead_aliens == ALIENS_COLS) {
-                printf("Increasing speed\n");
                 g_dead_aliens = 0;
                 g_alien_speed += g_alien_speed_increment;
                 update_alien_speeds();
@@ -488,9 +488,6 @@ void write_sin_wave(platform_sound_buffer* buffer, const uint32 frequency,
     }
 }
 
-static platform_window* g_window;
-static platform_backbuffer* g_backbuffer;
-static platform_sound_buffer* g_sound_buffer;
 
 static uint32 get_frames_from_time_sec(float32 time, uint32 samples_per_second)
 {
@@ -515,9 +512,10 @@ void game_init(const uint32 width_in_pixels, const uint32 height_in_pixels,
     const uint32 nb_samples_per_sec = 44100;
     const uint8 bits_per_sample = 16;
     init_sound(channels, nb_samples_per_sec, bits_per_sample, WINDOW_TITLE);
-    // FIXME: No output for 1 second
-    g_sound_buffer = create_sound_buffer(
-        get_frames_from_time_sec(1.0f, nb_samples_per_sec));
+    g_sound_buffer_shoot = create_sound_buffer(
+        get_frames_from_time_sec(0.2f, nb_samples_per_sec));
+    g_sound_buffer_kill = create_sound_buffer(
+        get_frames_from_time_sec(0.2f, nb_samples_per_sec));
     init_input();
     init_entity_system();
     rng.init_seed32(SEED);
@@ -530,7 +528,8 @@ void game_destroy(void)
     LOG_TRACE("Destroying game\n");
     destroy_window(g_window);
     destroy_backbuffer(g_backbuffer);
-    destroy_sound_buffer(g_sound_buffer);
+    destroy_sound_buffer(g_sound_buffer_shoot);
+    destroy_sound_buffer(g_sound_buffer_kill);
     delete g_screen_info;
     teardown_sound();
     teardown_input();
@@ -550,13 +549,11 @@ void process_input(float64 delta)
         uint32 proj_row = positions[g_spaceship_id.index].y - 1;
         uint32 proj_col = positions[g_spaceship_id.index].x
                           + sprites[g_spaceship_id.index].width / 2;
-        if(!entity_in_use[g_spaceship_projectile.index]) {
+        if(!entity_in_use[g_spaceship_projectile.index]
+           || !entity_valid(g_spaceship_projectile)) {
             g_spaceship_projectile = create_projectile(proj_row, proj_col, 0,
                                                        g_projectile_speed);
-        } else if(!entity_valid(g_spaceship_projectile)) {
-
-            g_spaceship_projectile = create_projectile(proj_row, proj_col, 0,
-                                                       g_projectile_speed);
+            play_sound_buffer(g_sound_buffer_shoot);
         }
     }
 
@@ -650,6 +647,7 @@ static void generate_alien_projectile(float64 delta,
 
             g_aliens_projectiles.add(
                 create_projectile(proj_row, proj_col, 0, -g_projectile_speed));
+            play_sound_buffer(g_sound_buffer_shoot);
         }
 
         *alien_projectile_timer = g_alien_projectile_frequency;
@@ -722,8 +720,8 @@ static void update_alien_positions(void)
 void game_main(void)
 {
     game_init(128, 130, 8);
-    write_sin_wave(g_sound_buffer, 300, 1600);
-    play_sound_buffer(g_sound_buffer);
+    write_sin_wave(g_sound_buffer_shoot, 300, 1600);
+    write_sin_wave(g_sound_buffer_kill, 500, 1600);
     float64 last_measurement = get_time_ms();
     // TODO: What should be the first value of delta?
     float64 delta = 0;

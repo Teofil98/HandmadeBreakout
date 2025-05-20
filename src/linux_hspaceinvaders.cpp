@@ -3,6 +3,7 @@
 #include "include/input.h"
 #include "include/logging.h"
 #include "include/platform_layer.h"
+#include "include/circular_buffer.h"
 #include <X11/XKBlib.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -12,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <pthread.h>
+#include <semaphore.h>
 
 static Display* g_display_server;
 static uint64 g_screen;
@@ -24,6 +27,7 @@ static Window g_root_window;
 #define POSY 500
 #define BORDER_W 15
 #define PIXEL_SIZE 4
+#define SOUND_SAMPLES 100
 
 struct platform_window_context {
     GC gc;
@@ -34,12 +38,22 @@ struct platform_backbuffer_context {
     XImage* image;
 };
 
+struct sound_buffer_element {
+    void* buffer;
+    uint64 size;
+};
+
 struct linux_context {
     pa_simple* sound_stream;
     uint32 max_hw_frames;
     uint16 audio_nb_channels;
     uint32 audio_nb_samples_per_sec;
     uint8 audio_bits_per_sample;
+    circular_buffer<sound_buffer_element, SOUND_SAMPLES> sound_circular_buffer;
+    sem_t sound_semaphore;
+    pthread_mutex_t sound_lock;
+    pthread_t sound_thread;
+    bool kill_sound_thread;
 };
 
 struct platform_sound_buffer_context {
@@ -245,6 +259,32 @@ void poll_platform_messages(void)
     }
 }
 
+static void* sound_thread_function(void* arg)
+{
+    UNUSED(arg);
+    while(true) {
+        sem_wait(&g_linux_context.sound_semaphore);
+        if(g_linux_context.kill_sound_thread) {
+            break;
+        }
+        // play the next sample in the circular buffer;
+        pthread_mutex_lock(&g_linux_context.sound_lock);
+        sound_buffer_element sample = g_linux_context.sound_circular_buffer
+                                          .read();
+        pthread_mutex_unlock(&g_linux_context.sound_lock);
+
+        int error = 0;
+        int ret;
+        ret = pa_simple_write(g_linux_context.sound_stream, sample.buffer,
+                              sample.size, &error);
+
+        if(ret < 0) {
+            LOG_ERROR("Error on pa_simple_write(): %s\n", pa_strerror(error));
+        }
+    }
+    return NULL;
+}
+
 void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
                 const uint8 bits_per_sample, const char* name)
 {
@@ -275,6 +315,12 @@ void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
     g_linux_context.audio_bits_per_sample = bits_per_sample;
     g_linux_context.audio_nb_samples_per_sec = nb_samples_per_sec;
     g_linux_context.audio_nb_channels = nb_channels;
+
+    // TODO: should this be atomic?
+    g_linux_context.kill_sound_thread = false;
+    sem_init(&g_linux_context.sound_semaphore, 0, 0);
+    pthread_mutex_init(&g_linux_context.sound_lock, NULL);
+    pthread_create(&g_linux_context.sound_thread, NULL, sound_thread_function, (void*)NULL);
 
     LOG_TRACE("Sound subsystem successfully initialized\n");
 }
@@ -309,24 +355,33 @@ void destroy_sound_buffer(platform_sound_buffer* sound_buffer)
     LOG_TRACE("Destroyed sound buffer\n");
 }
 
-// FIXME: The while loop causes delay for displaying graphics
-// Maybe want to have this as a separate thread
+
+
+// NOTE: This does NOT copy the contents of the buffer, merely
+// adds the pointer to the circular buffer to be played
 void play_sound_buffer(platform_sound_buffer* sound_buffer)
 {
-    int error = 0;
-    int ret;
-    ret = pa_simple_write(g_linux_context.sound_stream,  sound_buffer->buffer, sound_buffer->size_bytes, &error);
-
-    if(ret < 0) {
-        LOG_ERROR("Error on pa_simple_write(): %s\n", pa_strerror(error));
-    }
+    sound_buffer_element elem;
+    elem.buffer = sound_buffer->buffer;
+    elem.size = sound_buffer->size_bytes;
+    pthread_mutex_lock(&g_linux_context.sound_lock);
+    g_linux_context.sound_circular_buffer.insert(elem);
+    pthread_mutex_unlock(&g_linux_context.sound_lock);
+    sem_post(&g_linux_context.sound_semaphore);
 }
 
 void teardown_sound()
 {
     LOG_TRACE("Tearing down sound subsystem\n");
+
+    g_linux_context.kill_sound_thread = true;
+    sem_post(&g_linux_context.sound_semaphore);
+    pthread_join(g_linux_context.sound_thread, NULL);
+
     pa_simple_drain(g_linux_context.sound_stream, NULL);
     pa_simple_free(g_linux_context.sound_stream);
+    sem_destroy(&g_linux_context.sound_semaphore);
+    pthread_mutex_destroy(&g_linux_context.sound_lock);
     LOG_TRACE("Sound subsystem closed\n");
 }
 

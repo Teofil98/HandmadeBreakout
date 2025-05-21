@@ -1,6 +1,8 @@
 #include "include/defines.h"
 #include "include/hspaceinvaders.h"
 #include "include/platform_layer.h"
+#include "include/logging.h"
+#include "include/input.h"
 #include <objbase.h>
 #include <stdio.h> // TODO: Delete after testing done
 #include <windows.h>
@@ -44,6 +46,10 @@ static platform_backbuffer* g_backbuffer; // TODO: See when/if to free this
 // TODO: See when/if/how to free stuff inside this
 static win32_xaudio2 g_xaudio2;
 static win32_context g_context;
+
+// TODO: This is also defined in Linux,
+// maybe move in common place
+key_state keys[NUM_KEYS];
 
 static win32_window_size win32_get_window_size(const HWND window)
 {
@@ -253,10 +259,11 @@ void destroy_window(platform_window* window)
 }
 
 void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
-                const uint8 bits_per_sample)
+                const uint8 bits_per_sample, const char* name)
 {
     const uint16 block_align = (nb_channels * bits_per_sample) / 8;
     const uint32 avg_bytes_per_sec = nb_samples_per_sec * block_align;
+    UNUSED(name);
     g_context.wave_format = {
         .wFormatTag = WAVE_FORMAT_PCM, // TODO: See if this is the format I want
                                        // to use
@@ -272,16 +279,45 @@ void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
 }
 
 // FIXME: Implement teardown_sound
+void teardown_sound()
+{
+    LOG_TRACE("Tearing down sound subsystem\n");
+    // TODO: Implement
+    LOG_TRACE("Sound subsystem closed\n");
+}
+
+void teardown_input(void)
+{
+    LOG_TRACE("Tearing down input subsystem\n");
+    LOG_TRACE("Input subsystem closed\n");
+}
+
+float64 get_time_ms(void)
+{
+    LARGE_INTEGER frequency;
+    LARGE_INTEGER counter;
+    
+    // Get the frequency of the performance counter
+    QueryPerformanceFrequency(&frequency);
+    
+    // Get the current value of the performance counter
+    QueryPerformanceCounter(&counter);
+    
+    // Convert the counter value to milliseconds
+    return (counter.QuadPart * 1000.0) / frequency.QuadPart;
+}
 
 // FIXME: Change signature to include size of buffer
-platform_sound_buffer* create_sound_buffer(void)
+platform_sound_buffer* create_sound_buffer(uint32 size_frames)
 {
     platform_sound_buffer* sound_buffer = new platform_sound_buffer;
     sound_buffer->context = new platform_sound_buffer_context;
 
-    const uint32 sound_buffer_size
-        = g_context.wave_format
-              .nAvgBytesPerSec; // TODO: See how much I want this value to be
+//    const uint32 sound_buffer_size
+//        = g_context.wave_format
+//              .nAvgBytesPerSec; // TODO: See how much I want this value to be
+    // FIXME: Replace 4 with actual computation using knwon values
+    const uint32 sound_buffer_size = size_frames * 4;
     void* platform_sound_buffer = VirtualAlloc(
         NULL, sound_buffer_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
     sound_buffer->buffer = platform_sound_buffer;
@@ -302,6 +338,19 @@ platform_sound_buffer* create_sound_buffer(void)
     };
 
     return sound_buffer;
+}
+
+// TODO: This is currently the same implementation as in Linux, maybe it
+// can be implemented in platform layer
+void init_input(void)
+{
+    LOG_TRACE("Initializing input subsystem\n");
+    for(int i = 0; i < NUM_KEYS; i++) {
+        keys[i].pressed = false;
+        keys[i].held = false;
+        keys[i].released = false;
+    }
+    LOG_TRACE("Input subsystem successfully initialized\n");
 }
 
 void destroy_sound_buffer(platform_sound_buffer* sound_buffer)

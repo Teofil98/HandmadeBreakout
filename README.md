@@ -18,7 +18,7 @@ Space Invaders game made from scratch (as much as possible)
 ```
 
 ### Controls
-- `A`\`D` - move left/right
+- `A`\\`D` - move left/right
 - `Space` - shoot
 - `R` - restart game
 - `ESC` - close game

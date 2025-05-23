@@ -11,7 +11,21 @@ Space Invaders game made from scratch (as much as possible)
 ./linux_hspaceinvaders.elf
 ```
 
+### Windows
+```
+.\build.bat
+.\win32_hspaceinvaders.exe
+```
+
+### Controls
+- `A`\`D` - move left/right
+- `Space` - shoot
+- `R` - restart game
+- `ESC` - close game
+
 ## TODO
 
-- [ ] Windows port
+- [X] Windows port
+- [ ] Code cleanup
+- [ ] Makefile
 - [ ] Replace stdlib

@@ -90,8 +90,7 @@ platform_backbuffer* create_backbuffer(const uint32 width, const uint32 height,
 void destroy_backbuffer(platform_backbuffer* backbuffer)
 {
     if(!VirtualFree(backbuffer->bitmap, 0, MEM_RELEASE)) {
-        // TODO: Log error
-        printf("Failed to free allocated backbuffer\n");
+        LOG_ERROR("Failed to free allocated backbuffer\n");
     }
     delete backbuffer->context;
     delete backbuffer;
@@ -108,20 +107,82 @@ static void win32_display_backbuffer(const platform_backbuffer* backbuffer,
                   &backbuffer->context->bm_info, DIB_RGB_COLORS, SRCCOPY);
 }
 
+
+static status convert_win32_key(WPARAM w_param, key_id* k_id)
+{
+    switch(w_param) {
+        case VK_ESCAPE: {
+            *k_id = KEY_ESC;
+        } break;
+        case VK_SPACE: {
+            *k_id = KEY_SPACE;
+        } break;
+        case 'W': {
+            *k_id = KEY_W;
+        } break;
+        case 'A': {
+            *k_id = KEY_A;
+        } break;
+        case 'S': {
+            *k_id = KEY_S;
+        } break;
+        case 'D': {
+            *k_id = KEY_D;
+        } break;
+        case 'R': {
+            *k_id = KEY_R;
+        } break;
+        default: {
+            LOG_WARNING("Unknown Win32 Key: %lx\n", w_param);
+            return STATUS_FAILURE;
+        } break;
+    }
+    return STATUS_SUCCESS;
+}
+
+static void press_key(WPARAM w_param, LPARAM l_param)
+{
+    UNUSED(l_param);
+    key_id k_id;
+    if(convert_win32_key(w_param, &k_id) == STATUS_FAILURE) {
+        return;
+    } 
+
+    // TODO: Code same as in linux, maybe refactor
+    if(!keys[k_id].held) {
+        keys[k_id].pressed = true;
+    }
+    keys[k_id].held = true;
+}
+
+static void release_key(WPARAM w_param, LPARAM l_param)
+{
+    UNUSED(l_param);
+    key_id k_id;
+    if(convert_win32_key(w_param, &k_id) == STATUS_FAILURE) {
+        return;
+    }
+
+    // TODO: Code same as in linux, maybe refactor
+    keys[k_id].held = false;
+    keys[k_id].released = true;
+}
+
 LRESULT win32_window_callback(HWND window, UINT message, WPARAM w_param,
                               LPARAM l_param)
 {
     LRESULT result = 0;
     switch(message) {
         case WM_CLOSE: {
-            // TODO: display message to user before closing?
             // TODO: Handle destroy window somewhere, even though windows
             // destroys it on app exit.
-            g_running = false;
+            // TODO: Not very nice but works :) 
+            // Probably want something better to actually call the teardown functions
+            LOG_TRACE("WM_CLOSE event detected. Calling exit(0)!\n");
+            exit(0);
         } break;
         case WM_DESTROY: {
             // TODO: Treat this as error and recreate window?
-            g_running = false;
         } break;
         // TODO: Decide if I want to keep WM_PAINT or not, as it needs some ugly
         // global variables
@@ -138,22 +199,14 @@ LRESULT win32_window_callback(HWND window, UINT message, WPARAM w_param,
         case WM_SYSKEYDOWN: // fallthrough
         case WM_SYSKEYUP:   // fallthrough
         // TODO: Handle ALT+F4
-        case WM_KEYUP: // falthrough
         case WM_KEYDOWN: {
-            // FIXME: Implement proper {held, pressed, released, os?} button
-            // state once system independent layer is in progress. (HINT:
-            // l_param)
-            if(w_param == 'W') {
-                printf("W\n");
-            }
-            if(w_param == 'S') {
-                printf("S\n");
-            }
-            if(w_param == VK_ESCAPE) {
-                g_running = false;
-            }
+            press_key(w_param, l_param);
+        } break;
+        case WM_KEYUP: {
+            release_key(w_param, l_param);
         } break;
         default: {
+            // default processing of any message not defined above
             result = DefWindowProcA(window, message, w_param, l_param);
         }
     } // end switch
@@ -165,21 +218,18 @@ void win32_xaudio2_init(const WAVEFORMATEX* wave_format)
     // initialize COM
     HRESULT result = CoInitializeEx(0, COINIT_MULTITHREADED);
     if(FAILED(result)) {
-        // TODO: Log and handle error
-        printf("Error initializing COM\n");
+        LOG_ERROR("Error initializing COM\n");
     }
 
     result = XAudio2Create(&g_xaudio2.xaudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
     if(FAILED(result)) {
-        // TODO: Log and handle error
-        printf("Error initializing xaudio2\n");
+        LOG_ERROR("Error initializing xaudio2\n");
     }
 
     result = g_xaudio2.xaudio2->CreateMasteringVoice(
         &g_xaudio2.mastering_voice);
     if(FAILED(result)) {
-        // TODO: Log and handle error
-        printf("Error creating mastering voice\n");
+        LOG_ERROR("Error creating mastering voice\n");
     }
 
     // TODO: Later on maybe I want creating source voices to be a separate
@@ -187,8 +237,7 @@ void win32_xaudio2_init(const WAVEFORMATEX* wave_format)
     result = g_xaudio2.xaudio2->CreateSourceVoice(&g_xaudio2.source_voice,
                                                   wave_format);
     if(FAILED(result)) {
-        // TODO: Log and handle error
-        printf("Error creating source voice.\n");
+        LOG_ERROR("Error creating source voice.\n");
     }
 }
 
@@ -204,9 +253,7 @@ platform_window* open_window(const char* title, const uint32 width,
     };
     ATOM w_class_atom = RegisterClassExA(&window_class);
     if(w_class_atom == 0) {
-        // TODO: Log ERROR && Error handling
-        printf("Error, could not register window class\n");
-        // return -1; // TODO: Find actual code I want to return.
+        LOG_ERROR("Error, could not register window class\n");
     }
 
     DWORD window_style = WS_OVERLAPPEDWINDOW;
@@ -230,9 +277,7 @@ platform_window* open_window(const char* title, const uint32 width,
         NULL);
 
     if(window == NULL) {
-        // TODO: Log ERROR && Error handling
-        printf("Error, could not create window");
-        // return -1; // TODO: Find actual code I want to return.
+        LOG_ERROR("Error, could not create window");
     }
 
     // TODO: Set title
@@ -250,12 +295,48 @@ void destroy_window(platform_window* window)
     // TODO: Could let windows clean this up
     if(!DestroyWindow(window->context->window_handle)) {
         // TODO: Log and error handling.
-        printf("Failed to destroy window\n");
+        LOG_ERROR("Failed to destroy window\n");
     }
     // TODO: Class automatically unregistered when program terminates
     // See if I want to unregister manually
     delete window->context;
     delete window;
+}
+
+
+void teardown_input(void)
+{
+    LOG_TRACE("Tearing down input subsystem\n");
+    LOG_TRACE("Input subsystem closed\n");
+}
+
+float64 get_time_ms(void)
+{
+    LARGE_INTEGER frequency;
+    LARGE_INTEGER counter;
+    
+    // Get the frequency of the performance counter
+    QueryPerformanceFrequency(&frequency);
+    
+    // Get the current value of the performance counter
+    QueryPerformanceCounter(&counter);
+    
+    // Convert the counter value to milliseconds
+    return (counter.QuadPart * 1000.0) / frequency.QuadPart;
+}
+
+
+// TODO: This is currently the same implementation as in Linux, maybe it
+// can be implemented in platform layer
+void init_input(void)
+{
+    LOG_TRACE("Initializing input subsystem\n");
+    for(int i = 0; i < NUM_KEYS; i++) {
+        keys[i].pressed = false;
+        keys[i].held = false;
+        keys[i].released = false;
+    }
+    LOG_TRACE("Input subsystem successfully initialized\n");
 }
 
 void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
@@ -282,45 +363,32 @@ void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
 void teardown_sound()
 {
     LOG_TRACE("Tearing down sound subsystem\n");
-    // TODO: Implement
+    // TODO: Is there anything that needs to be done here?
     LOG_TRACE("Sound subsystem closed\n");
 }
-
-void teardown_input(void)
+void destroy_sound_buffer(platform_sound_buffer* sound_buffer)
 {
-    LOG_TRACE("Tearing down input subsystem\n");
-    LOG_TRACE("Input subsystem closed\n");
+    if(!VirtualFree(sound_buffer->buffer, 0, MEM_RELEASE)) {
+        LOG_ERROR("Could not free allocated sound buffer\n");
+    }
+    delete sound_buffer->context;
+    delete sound_buffer;
 }
 
-float64 get_time_ms(void)
-{
-    LARGE_INTEGER frequency;
-    LARGE_INTEGER counter;
-    
-    // Get the frequency of the performance counter
-    QueryPerformanceFrequency(&frequency);
-    
-    // Get the current value of the performance counter
-    QueryPerformanceCounter(&counter);
-    
-    // Convert the counter value to milliseconds
-    return (counter.QuadPart * 1000.0) / frequency.QuadPart;
-}
-
-// FIXME: Change signature to include size of buffer
 platform_sound_buffer* create_sound_buffer(uint32 size_frames)
 {
     platform_sound_buffer* sound_buffer = new platform_sound_buffer;
     sound_buffer->context = new platform_sound_buffer_context;
 
-//    const uint32 sound_buffer_size
-//        = g_context.wave_format
-//              .nAvgBytesPerSec; // TODO: See how much I want this value to be
     // FIXME: Replace 4 with actual computation using knwon values
     const uint32 sound_buffer_size = size_frames * 4;
-    void* platform_sound_buffer = VirtualAlloc(
+    void* buffer = VirtualAlloc(
         NULL, sound_buffer_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-    sound_buffer->buffer = platform_sound_buffer;
+    if(buffer == NULL) {
+        LOG_ERROR("Failed to allocate space for the sound buffer.");
+    }
+
+    sound_buffer->buffer = buffer;
     sound_buffer->bits_per_sample = g_context.wave_format.wBitsPerSample;
     sound_buffer->nb_samples_per_sec = g_context.wave_format.nSamplesPerSec;
     sound_buffer->nb_channels = g_context.wave_format.nChannels;
@@ -328,39 +396,17 @@ platform_sound_buffer* create_sound_buffer(uint32 size_frames)
     sound_buffer->context->buffer = {
         .Flags = 0,
         .AudioBytes = sound_buffer_size,
-        .pAudioData = (uint8*)platform_sound_buffer,
+        .pAudioData = (uint8*)buffer,
         .PlayBegin = 0,
         .PlayLength = 0,
         .LoopBegin = 0,
-        .LoopLength = g_context.wave_format.nSamplesPerSec,
-        .LoopCount = XAUDIO2_LOOP_INFINITE,
+        .LoopLength = 0,
+        .LoopCount = 0,
         .pContext = NULL
     };
 
+
     return sound_buffer;
-}
-
-// TODO: This is currently the same implementation as in Linux, maybe it
-// can be implemented in platform layer
-void init_input(void)
-{
-    LOG_TRACE("Initializing input subsystem\n");
-    for(int i = 0; i < NUM_KEYS; i++) {
-        keys[i].pressed = false;
-        keys[i].held = false;
-        keys[i].released = false;
-    }
-    LOG_TRACE("Input subsystem successfully initialized\n");
-}
-
-void destroy_sound_buffer(platform_sound_buffer* sound_buffer)
-{
-    if(!VirtualFree(sound_buffer->buffer, 0, MEM_RELEASE)) {
-        // TODO: Log error
-        printf("Could not free allocated sound buffer\n");
-    }
-    delete sound_buffer->context;
-    delete sound_buffer;
 }
 
 void play_sound_buffer(platform_sound_buffer* sound_buffer)
@@ -370,14 +416,12 @@ void play_sound_buffer(platform_sound_buffer* sound_buffer)
     HRESULT result = g_xaudio2.source_voice->SubmitSourceBuffer(
         &sound_buffer->context->buffer);
     if(FAILED(result)) {
-        // TODO: Log and handle error
-        printf("Error submitting sound buffer to source voice\n");
+        LOG_ERROR("Error submitting sound buffer to source voice. Error_core: 0x%lx\n", result);
     }
 
     result = g_xaudio2.source_voice->Start(0);
     if(FAILED(result)) {
-        // TODO: Log and handle error
-        printf("Error playing sound buffer on source voice\n");
+        LOG_ERROR("Error playing sound buffer on source voice\n");
     }
 }
 
@@ -397,13 +441,16 @@ uint64 get_timer_frequency(void)
 
 void poll_platform_messages(void)
 {
+    // TODO: This is same as in linux code
+    // reset all keys that were pressed or released the previous frames
+    for(int i = 0; i < NUM_KEYS; i++) {
+        keys[i].released = false;
+        keys[i].pressed = false;
+    }
+
     MSG message;
     // TODO: Do I want to do a while here?
     while(PeekMessageA(&message, 0, 0, 0, PM_REMOVE)) {
-        // FIXME: Can probably do this check in the switch in the callbacK
-        if(message.message == WM_QUIT) {
-            g_running = false;
-        }
         TranslateMessage(&message);
         DispatchMessageA(&message);
     }

@@ -1,9 +1,9 @@
-#include "include/defines.h"
-#include "include/hspaceinvaders.h"
+#include "../my_lib/defines.h"
+#include "../include/game.h"
 #include "include/input.h"
-#include "include/logging.h"
+#include "../my_lib/logging.h"
 #include "include/platform_layer.h"
-#include "include/circular_buffer.h"
+#include "../my_lib/circular_buffer.h"
 #include <X11/XKBlib.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>

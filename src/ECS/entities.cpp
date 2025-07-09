@@ -1,5 +1,5 @@
 #include "include/entities.h"
-#include "include/stack.h"
+#include "../my_lib/stack.h"
 
 position_component positions[MAX_ENTITIES];
 sprite_component sprites[MAX_ENTITIES];

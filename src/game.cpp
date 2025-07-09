@@ -1,12 +1,12 @@
-#include "include/hspaceinvaders.h"
-#include "include/defines.h"
-#include "include/entities.h"
-#include "include/input.h"
-#include "include/logging.h"
-#include "include/platform_layer.h"
-#include "include/array.h"
-#include "include/rand.h"
-#include "include/utils.h"
+#include "include/game.h"
+#include "my_lib/defines.h"
+#include "ECS/include/entities.h"
+#include "engine_core/include/input.h"
+#include "my_lib/logging.h"
+#include "engine_core/include/platform_layer.h"
+#include "my_lib/array.h"
+#include "my_lib/rand.h"
+#include "my_lib/utils.h"
 #include <math.h> // TODO: replace functions here with own implementation
 
 // GENERAL TODO: Check all return values of all functions and log errors where

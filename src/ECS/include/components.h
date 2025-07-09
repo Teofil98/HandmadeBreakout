@@ -1,6 +1,6 @@
 #pragma once
 
-#include "defines.h"
+#include "../../my_lib/defines.h"
 
 #define MAX_COMPONENTS 64
 

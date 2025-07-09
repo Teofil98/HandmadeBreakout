@@ -1,6 +1,6 @@
 #pragma once
 
-#include "defines.h"
+#include "../../my_lib/defines.h"
 
 struct platform_window_context;
 struct platform_window {

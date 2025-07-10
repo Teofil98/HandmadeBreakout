@@ -3,33 +3,33 @@
 #include "../../my_lib/defines.h"
 
 struct platform_window_context;
-struct platform_window {
+typedef struct platform_window {
     char* title;
     // TODO: See what I want to do with width and height when window is resized
     //uint32 width;
     //uint32 height;
-    platform_window_context* context;
-};
+    struct platform_window_context* context;
+} platform_window;
 
 struct platform_backbuffer_context;
-struct platform_backbuffer {
+typedef struct platform_backbuffer {
     uint32 bytes_per_pixel;
     void* bitmap;
     uint32 width;
     uint32 height;
-    platform_backbuffer_context* context;
-};
+    struct platform_backbuffer_context* context;
+} platform_backbuffer;
 
 struct platform_sound_buffer_context;
-struct platform_sound_buffer {
+typedef struct platform_sound_buffer {
     uint32 nb_samples_per_sec;
     uint8 bits_per_sample;
     void* buffer;
     uint32 size_bytes;
     uint8 nb_channels;
 	uint32 size_frames;
-    platform_sound_buffer_context* context;
-};
+    struct platform_sound_buffer_context* context;
+} platform_sound_buffer;
 
 platform_window* open_window(const char* title, const uint32 width, const uint32 height);
 void destroy_window(platform_window* window);

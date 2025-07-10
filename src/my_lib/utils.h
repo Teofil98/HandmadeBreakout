@@ -2,8 +2,6 @@
 
 #include "defines.h"
 
-namespace my_lib {
-
 template <typename T>
 inline T max(T a, T b)
 {
@@ -22,4 +20,3 @@ inline int8 signof(T arg)
     return (arg < 0) ? -1 : 1;
 }
 
-} // namespace my_lib

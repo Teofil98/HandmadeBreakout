@@ -29,35 +29,35 @@ static Window g_root_window;
 #define PIXEL_SIZE 4
 #define SOUND_SAMPLES 100
 
-struct platform_window_context {
+typedef struct platform_window_context {
     GC gc;
     Window window;
-};
+} pltform_window_context;
 
-struct platform_backbuffer_context {
+typedef struct platform_backbuffer_context {
     XImage* image;
-};
+} platform_backbuffer_context;
 
-struct sound_buffer_element {
+typedef struct sound_buffer_element {
     void* buffer;
     uint64 size;
-};
+} sound_buffer_element;
 
-struct linux_context {
+typedef struct linux_context {
     pa_simple* sound_stream;
     uint32 max_hw_frames;
     uint16 audio_nb_channels;
     uint32 audio_nb_samples_per_sec;
     uint8 audio_bits_per_sample;
-    circular_buffer<sound_buffer_element, SOUND_SAMPLES> sound_circular_buffer;
+    circular_buffer sound_circular_buffer;
     sem_t sound_semaphore;
     pthread_mutex_t sound_lock;
     pthread_t sound_thread;
     bool kill_sound_thread;
-};
+} linux_context;
 
-struct platform_sound_buffer_context {
-};
+typedef struct platform_sound_buffer_context {
+} platform_sound_buffer_context;
 
 static linux_context g_linux_context;
 
@@ -107,8 +107,10 @@ platform_window* open_window(const char* title, const uint32 width,
     XFree(window_title_propery.value);
     XMapWindow(g_display_server, window);
 
-    platform_window* plat_window = new platform_window;
-    plat_window->context = new platform_window_context;
+    platform_window* plat_window =
+        (platform_window*)malloc(sizeof(platform_window));
+    plat_window->context =
+        (struct platform_window_context*)malloc(sizeof(struct platform_window_context));
     plat_window->title = title_cpy;
     plat_window->context->gc = gc;
     plat_window->context->window = window;
@@ -146,8 +148,10 @@ platform_backbuffer* create_backbuffer(const uint32 width, const uint32 height,
             // the depth sorted out
         0);
 
-    platform_backbuffer* plat_backbuffer = new platform_backbuffer;
-    plat_backbuffer->context = new platform_backbuffer_context;
+    platform_backbuffer* plat_backbuffer =
+        (platform_backbuffer*)malloc(sizeof(platform_backbuffer));
+    plat_backbuffer->context =
+        (struct platform_backbuffer_context*)malloc(sizeof(struct platform_backbuffer_context));
     plat_backbuffer->height = height;
     plat_backbuffer->width = width;
     plat_backbuffer->bytes_per_pixel = bytes_per_pixel;
@@ -160,8 +164,8 @@ platform_backbuffer* create_backbuffer(const uint32 width, const uint32 height,
 void destroy_backbuffer(platform_backbuffer* backbuffer)
 {
     XDestroyImage(backbuffer->context->image);
-    delete backbuffer->context;
-    delete backbuffer;
+    free(backbuffer->context);
+    free(backbuffer);
 }
 
 void display_backbuffer(const platform_backbuffer* backbuffer,
@@ -269,17 +273,19 @@ static void* sound_thread_function(void* arg)
         }
         // play the next sample in the circular buffer;
         pthread_mutex_lock(&g_linux_context.sound_lock);
-        sound_buffer_element sample = g_linux_context.sound_circular_buffer
-                                          .read();
+        sound_buffer_element *sample =
+            (sound_buffer_element *)circular_buffer_read(
+                &g_linux_context.sound_circular_buffer);
         pthread_mutex_unlock(&g_linux_context.sound_lock);
 
         int error = 0;
         int ret;
-        ret = pa_simple_write(g_linux_context.sound_stream, sample.buffer,
-                              sample.size, &error);
+        ret = pa_simple_write(g_linux_context.sound_stream, sample->buffer,
+                              sample->size, &error);
+        free(sample);
 
-        if(ret < 0) {
-            LOG_ERROR("Error on pa_simple_write(): %s\n", pa_strerror(error));
+        if (ret < 0) {
+          LOG_ERROR("Error on pa_simple_write(): %s\n", pa_strerror(error));
         }
     }
     return NULL;
@@ -290,7 +296,9 @@ void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
 {
     LOG_TRACE("Initializing sound subsystem\n");
 
-    pa_sample_format format;
+    init_circular_buffer(&g_linux_context.sound_circular_buffer, SOUND_SAMPLES);
+
+    enum pa_sample_format format;
     if(bits_per_sample == 16) {
         // TODO: Do I want to also support the big endian case?
         format = PA_SAMPLE_S16LE;
@@ -325,20 +333,20 @@ void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
     LOG_TRACE("Sound subsystem successfully initialized\n");
 }
 
-platform_sound_buffer* create_sound_buffer(uint32 size_frames)
-{
+platform_sound_buffer *create_sound_buffer(uint32 size_frames) {
     LOG_TRACE("Creating sound buffer.\n");
-    platform_sound_buffer* sound_buffer = new platform_sound_buffer;
-    sound_buffer->context = new platform_sound_buffer_context;
-
-
+    platform_sound_buffer *sound_buffer =
+        (platform_sound_buffer *)malloc(sizeof(platform_sound_buffer));
+    sound_buffer->context =
+        (platform_sound_buffer_context *)malloc(
+                sizeof(platform_sound_buffer_context));
     sound_buffer->nb_samples_per_sec = g_linux_context.audio_nb_samples_per_sec;
     sound_buffer->bits_per_sample = g_linux_context.audio_bits_per_sample;
     sound_buffer->nb_channels = g_linux_context.audio_nb_channels;
 
     // FIXME: Replace 4 with actual computation using knwon values
     uint32 size = size_frames * 4; /* 2 bytes/sample, 2 channels */
-    sound_buffer->buffer = (void*)malloc(size * sizeof(uint8));
+    sound_buffer->buffer = (void *)malloc(size * sizeof(uint8));
     sound_buffer->size_bytes = size;
     sound_buffer->size_frames = size_frames;
 
@@ -350,8 +358,8 @@ void destroy_sound_buffer(platform_sound_buffer* sound_buffer)
 {
     LOG_TRACE("Destroying sound buffer\n");
     free(sound_buffer->buffer);
-    delete sound_buffer->context;
-    delete sound_buffer;
+    free(sound_buffer->context);
+    free(sound_buffer);
     LOG_TRACE("Destroyed sound buffer\n");
 }
 
@@ -359,15 +367,15 @@ void destroy_sound_buffer(platform_sound_buffer* sound_buffer)
 
 // NOTE: This does NOT copy the contents of the buffer, merely
 // adds the pointer to the circular buffer to be played
-void play_sound_buffer(platform_sound_buffer* sound_buffer)
-{
-    sound_buffer_element elem;
-    elem.buffer = sound_buffer->buffer;
-    elem.size = sound_buffer->size_bytes;
-    pthread_mutex_lock(&g_linux_context.sound_lock);
-    g_linux_context.sound_circular_buffer.insert(elem);
-    pthread_mutex_unlock(&g_linux_context.sound_lock);
-    sem_post(&g_linux_context.sound_semaphore);
+void play_sound_buffer(platform_sound_buffer *sound_buffer) {
+  sound_buffer_element *elem =
+      (sound_buffer_element *)malloc(sizeof(sound_buffer_element));
+  elem->buffer = sound_buffer->buffer;
+  elem->size = sound_buffer->size_bytes;
+  pthread_mutex_lock(&g_linux_context.sound_lock);
+  circular_buffer_insert(&g_linux_context.sound_circular_buffer, (void*)elem);
+  pthread_mutex_unlock(&g_linux_context.sound_lock);
+  sem_post(&g_linux_context.sound_semaphore);
 }
 
 void teardown_sound()
@@ -382,6 +390,7 @@ void teardown_sound()
     pa_simple_free(g_linux_context.sound_stream);
     sem_destroy(&g_linux_context.sound_semaphore);
     pthread_mutex_destroy(&g_linux_context.sound_lock);
+    free_circular_buffer(&g_linux_context.sound_circular_buffer);
     LOG_TRACE("Sound subsystem closed\n");
 }
 

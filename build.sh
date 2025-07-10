@@ -23,9 +23,9 @@ fi
 
 mkdir -p build
 pushd build
-g++ $flags -std=c++20 -g ../src/engine_core/linux_engine_core.cpp \
-                            ../src/game.cpp \
-                            ../src/ECS/entities.cpp \
+gcc $flags -std=c99 -g ../src/engine_core/linux_engine_core.c \
+                            ../src/game.c \
+                            ../src/ECS/entities.c \
                             -lX11 -lpulse-simple -lpulse -lpthread \
                             $link_flags \
                             -o ../linux_game.elf

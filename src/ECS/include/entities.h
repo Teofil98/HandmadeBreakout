@@ -2,13 +2,14 @@
 
 #include "components.h"
 #include "../../my_lib/defines.h"
+#include <stdbool.h>
 
 #define MAX_ENTITIES 100
 
-struct entity_id {
+typedef struct entity_id {
     uint64 index : 32;
     uint64 version : 32;
-};
+} entity_id;
 
 extern entity_id entity_id_array[MAX_ENTITIES];
 

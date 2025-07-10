@@ -87,7 +87,7 @@ static int32 g_alien_speed = INITIAL_ALIEN_SPEED;
 static int32 g_alien_speed_increment = 15;
 static int32 g_dead_aliens = 0;
 static entity_id g_spaceship_id;
-static my_lib::array<entity_id, ALIENS_ROWS * ALIENS_COLS> g_aliens;
+static array<entity_id, ALIENS_ROWS * ALIENS_COLS> g_aliens;
 static my_lib::array<entity_id, MAX_ALIEN_PROJECTILES> g_aliens_projectiles;
 static float64 g_alien_projectile_frequency = INITIAL_PROJECTILE_FREQ;
 static float64 g_alien_projectile_frequency_decrement = 0.5;
@@ -172,14 +172,16 @@ static void create_alien_matrix(void)
     const uint32 initial_col = 3;
     const uint32 initial_row = 3;
     uint32 row_space = 0;
-    g_aliens.resize(ALIENS_ROWS * ALIENS_COLS);
+    array_resize(&g_aliens, ALIENS_ROWS * ALIENS_COLS);
     for(uint32 i = 0; i < ALIENS_ROWS; i++) {
         uint32 col_space = 0;
         for(uint32 j = 0; j < ALIENS_COLS; j++) {
             const uint32 row = initial_row + i * g_alien_height + row_space;
             const uint32 col = initial_col + j * g_alien_width + col_space;
             col_space += 3;
-            g_aliens[i * ALIENS_COLS + j] = create_alien(row, col);
+            entity_id* elem = (entity_id*)malloc(sizeof(entity_id));
+            *elem = create_alien(row, col);
+            array_set(&g_aliens, i * ALIENS_COLS + j, (void*)elem) ;
         }
         row_space += 2;
     }
@@ -334,7 +336,7 @@ static bool collide(entity_id obj1, entity_id obj2)
 
 static void update_alien_speeds(void)
 {
-    for(uint64 i = 0; i < g_aliens.get_size(); i++) {
+    for(uint64 i = 0; i < array_get_size(&g_aliens); i++) {
         if(!entity_valid(g_aliens[i])) {
             continue;
         }

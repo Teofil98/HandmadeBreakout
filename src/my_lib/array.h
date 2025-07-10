@@ -3,63 +3,54 @@
 #include "defines.h"
 #include "logging.h"
 
-namespace my_lib {
 
-template <typename T, uint64 N>
-class array
-{
-public:
-
-    array() : size{0} {};
-
-    void add(T val) {
-        ASSERT(size < N, "Array full!\n");
-        elements[size] = val;
-        size++;
-    }
-
-    // Fast delete, changes the relative order of the elements
-    void delete_idx_fast(uint64 idx)
-    {
-        ASSERT(idx < size, "Array buffer overflow!\n");
-        //ASSERT(idx >= 0, "Trying to delete negative index!\n");
-        elements[idx] = elements[size - 1];
-        size--;
-    }
-
-    // TODO: Test the operators
-    T& operator[](uint64 idx)
-    {
-        ASSERT(idx < size, "Array buffer overflow! (idx: %ld, size: %ld)\n");
-        return elements[idx];
-    }
-
-    T operator[](uint64 idx) const
-    {
-        const T elem = this[idx];
-        return elem;
-    }
-
-    void resize(uint64 new_size)
-    {
-        ASSERT(new_size <= N, "Trying to resize outside of array bounds\n");
-        size = new_size;
-    }
-
-    uint64 get_size()
-    {
-        return size;
-    }
-
-    uint64 get_capacity()
-    {
-        return N;
-    }
-
-private:
-    T elements[N];
+typedef struct array {
+    void** elements;
     uint64 size;
-};
+    uint64 capacity;
+} array;
 
-} // namespace my_lib
+inline void array_add(array* a, void* val)
+{
+    ASSERT(size < N, "Array full!\n");
+    a->elements[a->size] = val;
+    (a->size)++;
+}
 
+// Fast delete, changes the relative order of the elements
+inline void array_delete_idx_fast(array* a, uint64 idx)
+{
+    ASSERT(idx < size, "Array buffer overflow!\n");
+    // ASSERT(idx >= 0, "Trying to delete negative index!\n");
+    free(a->elements[idx]);
+    a->elements[idx] = a->elements[a->size - 1];
+    (a->size)--;
+}
+
+inline void* array_get(array* a, uint64 idx) { return a->elements[idx]; }
+inline void array_set(array* a, uint64 idx, void* val) { a->elements[idx] = val; }
+
+inline void array_resize(array* a, uint64 new_size)
+{
+    ASSERT(new_size <= N, "Trying to resize outside of array bounds\n");
+    a->size = new_size;
+}
+
+inline uint64 array_get_size(array* a) { return a->size; }
+
+inline uint64 array_get_capacity(array* a) { return a->capacity; }
+
+inline void init_array(array* a, uint64 capacity)
+{
+    a->elements = (void**)malloc(capacity * sizeof(void*));
+    a->capacity = capacity;
+    a->size = 0;
+}
+
+inline void free_array(array* a)
+{
+    for(int i = 0; i < a->size; i++) {
+        free(a->elements[i]);
+    }
+    free((void*)a->elements);
+}

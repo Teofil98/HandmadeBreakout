@@ -49,7 +49,7 @@ inline void init_array(array* a, uint64 capacity)
 
 inline void free_array(array* a)
 {
-    for(int i = 0; i < a->size; i++) {
+    for(uint64 i = 0; i < a->size; i++) {
         free(a->elements[i]);
     }
     free((void*)a->elements);

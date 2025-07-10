@@ -19,7 +19,7 @@
 #define INITIAL_PROJECTILE_FREQ 2
 #define INITIAL_ALIEN_SPEED 15
 
-struct screen_information {
+typedef struct screen_information {
 
     screen_information(uint32 wip, uint32 hip, uint32 ps)
         : width_in_pixels { wip }, height_in_pixels { hip }, pixel_size { ps }
@@ -33,9 +33,9 @@ struct screen_information {
     uint32 pixel_size;
     uint32 screen_width;
     uint32 screen_height;
-};
+} screen_information;
 
-struct object {
+/*struct object {
 
     object(const uint8 w, const uint8 h, const uint8* sprite, uint32 color)
         : width { w }, height { h }, sprite { sprite }, color { color },
@@ -48,7 +48,7 @@ struct object {
     // Current position of sprite
     float32 row;
     float32 col;
-};
+};*/
 
 static screen_information* g_screen_info;
 
@@ -337,11 +337,11 @@ static bool collide(entity_id obj1, entity_id obj2)
 static void update_alien_speeds(void)
 {
     for(uint64 i = 0; i < array_get_size(&g_aliens); i++) {
-        if(!entity_valid(g_aliens[i])) {
+        if(!entity_valid(*(entity_id*)array_get(&g_aliens, i)) {
             continue;
         }
         int8 sign = my_lib::signof(directions[g_aliens[i].index].x);
-        directions[g_aliens[i].index].x = sign * g_alien_speed;
+        directions[array_get(&g_aliens,i)->index].x = sign * g_alien_speed;
     }
 }
 
@@ -349,7 +349,7 @@ static void collide_user_proj(void)
 {
     uint64 curr_alien = 0;
 
-    while(curr_alien < g_aliens.get_size()) {
+    while(curr_alien < array_get_size(&g_aliens)) {
         if(entity_valid(g_aliens[curr_alien])
            && collide(g_spaceship_projectile, g_aliens[curr_alien])) {
             delete_entity_id(g_aliens[curr_alien]);

@@ -1,6 +1,6 @@
 #include "defines.h"
 
-class random_number_generator
+typedef struct random_number_generator
 {
 public:
     uint32 state = 0;
@@ -12,7 +12,7 @@ public:
 
 private:
     void xorshift32(void);
-};
+} random_number_generator;
 
 /* The state must be initialized to non-zero */
 inline void random_number_generator::xorshift32(void)

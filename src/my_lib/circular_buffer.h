@@ -13,7 +13,7 @@ typedef struct circular_buffer {
     uint64 size;
 } circular_buffer;
 
-inline uint64 circular_buffer_inc_pointer(circular_buffer* c_buf, uint64 ptr)
+static inline uint64 circular_buffer_inc_pointer(circular_buffer* c_buf, uint64 ptr)
 {
     ptr++;
     if(ptr == c_buf->size) {
@@ -22,17 +22,17 @@ inline uint64 circular_buffer_inc_pointer(circular_buffer* c_buf, uint64 ptr)
     return ptr;
 }
 
-inline bool circular_buffer_is_empty(circular_buffer* c_buf)
+static inline bool circular_buffer_is_empty(circular_buffer* c_buf)
 {
     return c_buf->head == c_buf->tail;
 }
 
-inline bool circular_buffer_is_full(circular_buffer* c_buf)
+static inline bool circular_buffer_is_full(circular_buffer* c_buf)
 {
     return circular_buffer_inc_pointer(c_buf, c_buf->head) == c_buf->tail;
 }
 
-inline void init_circular_buffer(circular_buffer* c_buf, uint64 size)
+static inline void init_circular_buffer(circular_buffer* c_buf, uint64 size)
 {
     c_buf->buffer = (void**)malloc(size * sizeof(void*));
     c_buf->head = 0;
@@ -40,7 +40,7 @@ inline void init_circular_buffer(circular_buffer* c_buf, uint64 size)
     c_buf->size = size;
 }
 
-inline void circular_buffer_insert(circular_buffer* c_buf, void* value)
+static inline void circular_buffer_insert(circular_buffer* c_buf, void* value)
 {
     ASSERT(!circular_buffer_is_full(c_buf),
            "[insert] Circular buffer is full!");
@@ -48,7 +48,7 @@ inline void circular_buffer_insert(circular_buffer* c_buf, void* value)
     c_buf->head = circular_buffer_inc_pointer(c_buf, c_buf->head);
 }
 
-inline void* circular_buffer_read(circular_buffer* c_buf)
+static inline void* circular_buffer_read(circular_buffer* c_buf)
 {
     ASSERT(!circular_buffer_is_empty(c_buf), "[read] Circular buffer is empty");
     void* value = c_buf->buffer[c_buf->tail];
@@ -56,7 +56,7 @@ inline void* circular_buffer_read(circular_buffer* c_buf)
     return value;
 }
 
-inline void free_circular_buffer(circular_buffer* c_buf)
+static inline void free_circular_buffer(circular_buffer* c_buf)
 {
     while(!circular_buffer_is_empty(c_buf)) {
         void* ptr = circular_buffer_read(c_buf);

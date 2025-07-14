@@ -1,42 +1,45 @@
+// clang-format Language: C
 #pragma once
+
+// TODO: Implement with macros
 
 #include "defines.h"
 #include "logging.h"
 #include <stdio.h>
 
-template <typename T, uint64 N> class stack
+typedef struct stack
 {
-public:
-    stack() : top { 0 } {}
-
-    void push(T val);
-    T pop();
-
-    void print()
-    {
-        printf("[");
-        for(int i = 0; i < top; i++) {
-            printf("%ld ", data[i]);
-        }
-        printf("]\n");
-    }
-
-private:
-    T data[N];
+    void** data;
     uint64 top;
-};
+    uint64 size;
+} stack;
 
-template <typename T, uint64 N> void stack<T, N>::push(T val)
+static inline void init_stack(stack* s, uint64 size)
 {
-    ASSERT(top < N, "Pushing on full stack! Stack overflow!");
-    data[top] = val;
-    top++;
+    s->top = 0;
+    s->size = size;
+    s->data = (void**)malloc(sizeof(void*) * size);
 }
 
-template <typename T, uint64 N> T stack<T, N>::pop()
+static inline void free_stack(stack* s)
+{
+    for(uint64 i = 0; i < s->top; i++) {
+        free(s->data[i]);
+    }
+    free((void*)s->data);
+}
+
+static inline void stack_push(stack* s, void* val)
+{
+    ASSERT(s->top < N, "Pushing on full stack! Stack overflow!");
+    s->data[s->top] = val;
+    s->top++;
+}
+
+static inline void* stack_pop(stack* s)
 {
     ASSERT(top > 0, "Trying to pop empty stack!");
-    T val = data[top - 1];
-    top--;
+    void* val = s->data[s->top - 1];
+    s->top--;
     return val;
 }

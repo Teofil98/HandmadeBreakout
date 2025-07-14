@@ -1,9 +1,10 @@
 #pragma once
 
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers" 
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #pragma GCC diagnostic warning "-Wunused-function"
 #pragma GCC diagnostic warning "-Wunused-variable"
 #pragma GCC diagnostic warning "-Wunused-but-set-variable"
+//#pragma GCC diagnostic warning "-Wpedantic"
 
 #include <stdint.h>
 

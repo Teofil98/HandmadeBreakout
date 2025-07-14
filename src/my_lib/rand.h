@@ -1,44 +1,39 @@
+// clang-format Language: C
 #include "defines.h"
 
-typedef struct random_number_generator
-{
-public:
-    uint32 state = 0;
-
-    void init_seed32(uint32 seed);
-    uint32 rand_int32();
-    // get a random uint32 in the interval [start, end]
-    uint32 rand_int32(uint32 start, uint32 end);
-
-private:
-    void xorshift32(void);
+typedef struct random_number_generator {
+    uint32 state;
 } random_number_generator;
 
-/* The state must be initialized to non-zero */
-inline void random_number_generator::xorshift32(void)
+// TODO: Move definitions in separate file?
+
+// The state must be initialized to non-zero
+static inline void rand32_xorshift(random_number_generator* rng)
 {
-    /* Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs" */
-    state ^= state << 13;
-    state ^= state >> 17;
-    state ^= state << 5;
+    // Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs"
+    rng->state ^= rng->state << 13;
+    rng->state ^= rng->state >> 17;
+    rng->state ^= rng->state << 5;
 }
 
-inline uint32 random_number_generator::rand_int32()
+static inline uint32 rand32_rand(random_number_generator* rng)
 {
-    xorshift32();
-    return state;
+    rand32_xorshift(rng);
+    return rng->state;
 }
 
-inline uint32 random_number_generator::rand_int32(uint32 start, uint32 end)
+// get a random uint32 in the interval [start, end]
+static inline uint32 rand32_rand_interval(random_number_generator* rng,
+                                          uint32 start, uint32 end)
 {
-    xorshift32();
+    rand32_xorshift(rng);
     // NOTE: More robust but slower alternative
-    //float64 ratio = (float64)state / UINT32_MAXIMUM;
-    //return (uint32)((end - start) * ratio + start);
-    return state % (end + 1 - start) + start;
+    // float64 ratio = (float64)state / UINT32_MAXIMUM;
+    // return (uint32)((end - start) * ratio + start);
+    return rng->state % (end + 1 - start) + start;
 }
 
-inline void random_number_generator::init_seed32(uint32 seed)
+static inline void rand32_init(random_number_generator* rng, uint32 seed)
 {
-    state = seed;
+    rng->state = seed;
 }

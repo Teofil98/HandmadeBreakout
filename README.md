@@ -25,7 +25,7 @@ Space Invaders game made from scratch (as much as possible)
 
 ## TODO
 
-- [X] Windows port
+- [ ] Fix memory leaks
+- [ ] Implement generic DSes with macros instead of void pointers
 - [ ] Code cleanup
-- [ ] Makefile
 - [ ] Replace stdlib

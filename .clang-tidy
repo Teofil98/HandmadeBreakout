@@ -2,7 +2,7 @@
 Checks: >
   -*,
   bugprone-*,
-  -concurrency-*, #reactivate once I do threating
+  -concurrency-*, #reactivate once I do threading
   linuxkernel-*,
   misc-*,
   performance-*,

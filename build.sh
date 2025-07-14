@@ -14,7 +14,7 @@ if [ $1 = "release" ]; then
     flags="-O3"
     link_flags=""
 elif [ $1 = "debug" ]; then
-    flags="-Wall -Wextra -Werror -pedantic -fsanitize=address -fsanitize=undefined"
+    flags="-Wall -Wextra -Werror -fsanitize=address -fsanitize=undefined"
     link_flags=""
 else
     echo "Error! Unknown argument \"$1\". Expected \"debug\" or \"release\"" >&2
@@ -23,10 +23,10 @@ fi
 
 mkdir -p build
 pushd build
-g++ $flags -std=c++20 -g ../src/engine_core/linux_engine_core.cpp \
-                            ../src/game.cpp \
-                            ../src/ECS/entities.cpp \
-                            -lX11 -lpulse-simple -lpulse -lpthread \
+gcc $flags -std=c99 -g ../src/engine_core/linux_engine_core.c \
+                            ../src/game.c \
+                            ../src/ECS/entities.c \
+                            -lX11 -lpulse-simple -lpulse -lpthread -lm\
                             $link_flags \
                             -o ../linux_game.elf
 

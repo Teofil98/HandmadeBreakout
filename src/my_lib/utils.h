@@ -1,25 +1,22 @@
+// clang-format Language: C
 #pragma once
 
-#include "defines.h"
+#define MAX(X, Y)                                                              \
+    ({                                                                         \
+        __typeof__(X) _x = (X);                                                \
+        __typeof__(Y) _y = (Y);                                                \
+        (_x > _y) ? _x : _y;                                                   \
+    })
 
-namespace my_lib {
+#define MIN(X, Y)                                                              \
+    ({                                                                         \
+        __typeof__(X) _x = (X);                                                \
+        _typeof_(Y) _y = (Y);                                                  \
+        (_x < _y) ? _x : _y;                                                   \
+    })
 
-template <typename T>
-inline T max(T a, T b)
-{
-    return ((a > b) ? a : b);
-}
-
-template <typename T>
-inline T min(T a, T b)
-{
-    return ((a < b) ? a : b);
-}
-
-template <typename T>
-inline int8 signof(T arg)
-{
-    return (arg < 0) ? -1 : 1;
-}
-
-} // namespace my_lib
+#define SIGNOF(X)                                                              \
+    ({                                                                         \
+        __typeof__(X) _x = (X);                                                \
+        (_x < 0) ? -1 : 1;                                                     \
+    })

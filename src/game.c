@@ -19,38 +19,25 @@
 #define INITIAL_PROJECTILE_FREQ 2
 #define INITIAL_ALIEN_SPEED 15
 
-struct screen_information {
-
-    screen_information(uint32 wip, uint32 hip, uint32 ps)
-        : width_in_pixels { wip }, height_in_pixels { hip }, pixel_size { ps }
-    {
-        screen_width = wip * ps;
-        screen_height = hip * ps;
-    };
-
+typedef struct screen_information {
     uint32 width_in_pixels;
     uint32 height_in_pixels;
     uint32 pixel_size;
     uint32 screen_width;
     uint32 screen_height;
-};
+} screen_information;
 
-struct object {
+static void init_screen_info(screen_information* info, uint32 width_in_px,
+                             uint32 height_in_px, uint32 px_size)
+{
+    info->width_in_pixels = width_in_px;
+    info->height_in_pixels = height_in_px;
+    info->pixel_size = px_size;
+    info->screen_width = width_in_px * px_size;
+    info->screen_height = height_in_px * px_size;
+}
 
-    object(const uint8 w, const uint8 h, const uint8* sprite, uint32 color)
-        : width { w }, height { h }, sprite { sprite }, color { color },
-          row { 0 }, col { 0 } {};
-
-    const uint32 width;
-    const uint32 height;
-    const uint8* sprite;
-    uint32 color;
-    // Current position of sprite
-    float32 row;
-    float32 col;
-};
-
-static screen_information* g_screen_info;
+static screen_information g_screen_info;
 
 static const uint8 spaceship_bytes[] = {
     "-----*-----"
@@ -87,8 +74,10 @@ static int32 g_alien_speed = INITIAL_ALIEN_SPEED;
 static int32 g_alien_speed_increment = 15;
 static int32 g_dead_aliens = 0;
 static entity_id g_spaceship_id;
-static my_lib::array<entity_id, ALIENS_ROWS * ALIENS_COLS> g_aliens;
-static my_lib::array<entity_id, MAX_ALIEN_PROJECTILES> g_aliens_projectiles;
+//static array<entity_id, ALIENS_ROWS * ALIENS_COLS> g_aliens;
+static array g_aliens;
+//static my_lib::array<entity_id, MAX_ALIEN_PROJECTILES> g_aliens_projectiles;
+static array g_aliens_projectiles;
 static float64 g_alien_projectile_frequency = INITIAL_PROJECTILE_FREQ;
 static float64 g_alien_projectile_frequency_decrement = 0.5;
 static bool g_next_alien_collision_side_left = false;
@@ -111,8 +100,8 @@ static entity_id create_spaceship(void)
     entity_id id = get_new_entity_id();
 
     position_component pos;
-    pos.x = g_screen_info->width_in_pixels/2;
-    pos.y = g_screen_info->height_in_pixels - 10;
+    pos.x = g_screen_info.width_in_pixels/2;
+    pos.y = g_screen_info.height_in_pixels - 10;
 
     sprite_component sprt;
     sprt.color = COLOR_WHITE;
@@ -172,14 +161,16 @@ static void create_alien_matrix(void)
     const uint32 initial_col = 3;
     const uint32 initial_row = 3;
     uint32 row_space = 0;
-    g_aliens.resize(ALIENS_ROWS * ALIENS_COLS);
+    array_resize(&g_aliens, ALIENS_ROWS * ALIENS_COLS);
     for(uint32 i = 0; i < ALIENS_ROWS; i++) {
         uint32 col_space = 0;
         for(uint32 j = 0; j < ALIENS_COLS; j++) {
             const uint32 row = initial_row + i * g_alien_height + row_space;
             const uint32 col = initial_col + j * g_alien_width + col_space;
             col_space += 3;
-            g_aliens[i * ALIENS_COLS + j] = create_alien(row, col);
+            entity_id* elem = (entity_id*)malloc(sizeof(entity_id));
+            *elem = create_alien(row, col);
+            array_set(&g_aliens, i * ALIENS_COLS + j, (void*)elem) ;
         }
         row_space += 2;
     }
@@ -222,22 +213,22 @@ static entity_id create_projectile(const uint32 row, const uint32 col,
 static void draw_pixel(platform_backbuffer* backbuffer, const uint32 row,
                        const uint32 col, const uint32 color)
 {
-    ASSERT(row < g_screen_info->height_in_pixels,
+    ASSERT(row < g_screen_info.height_in_pixels,
            "Attempting to draw pixel on row %d with a screen height of %d\n",
-           row, g_screen_info->height_in_pixels);
-    ASSERT(col < g_screen_info->width_in_pixels,
+           row, g_screen_info.height_in_pixels);
+    ASSERT(col < g_screen_info.width_in_pixels,
            "Attempting to draw pixel on col %d with a screen width of %d\n",
-           col, g_screen_info->width_in_pixels);
+           col, g_screen_info.width_in_pixels);
 
     uint32_t* pixels = (uint32_t*)backbuffer->bitmap;
     const uint32 nb_cols = backbuffer->width;
 
-    const uint32_t screen_row = row * g_screen_info->pixel_size;
-    const uint32_t screen_col = col * g_screen_info->pixel_size;
+    const uint32_t screen_row = row * g_screen_info.pixel_size;
+    const uint32_t screen_col = col * g_screen_info.pixel_size;
 
-    for(uint32 i = screen_row; i < screen_row + g_screen_info->pixel_size;
+    for(uint32 i = screen_row; i < screen_row + g_screen_info.pixel_size;
         i++) {
-        for(uint32 j = screen_col; j < screen_col + g_screen_info->pixel_size;
+        for(uint32 j = screen_col; j < screen_col + g_screen_info.pixel_size;
             j++) {
             pixels[i * nb_cols + j] = color;
         }
@@ -334,12 +325,15 @@ static bool collide(entity_id obj1, entity_id obj2)
 
 static void update_alien_speeds(void)
 {
-    for(uint64 i = 0; i < g_aliens.get_size(); i++) {
-        if(!entity_valid(g_aliens[i])) {
+    for(uint64 i = 0; i < array_get_size(&g_aliens); i++) {
+        // TODO: Fix ugly cast with beautiful macro?
+        entity_id alien = *((entity_id*)array_get(&g_aliens,i));
+        if(!entity_valid(alien)) {
             continue;
         }
-        int8 sign = my_lib::signof(directions[g_aliens[i].index].x);
-        directions[g_aliens[i].index].x = sign * g_alien_speed;
+
+        int8 sign = SIGNOF(directions[alien.index].x);
+        directions[alien.index].x = sign * g_alien_speed;
     }
 }
 
@@ -347,10 +341,11 @@ static void collide_user_proj(void)
 {
     uint64 curr_alien = 0;
 
-    while(curr_alien < g_aliens.get_size()) {
-        if(entity_valid(g_aliens[curr_alien])
-           && collide(g_spaceship_projectile, g_aliens[curr_alien])) {
-            delete_entity_id(g_aliens[curr_alien]);
+    while(curr_alien < array_get_size(&g_aliens)) {
+        // TODO: Fix ugly cast with beautiful macro?
+        entity_id alien = *((entity_id*)array_get(&g_aliens, curr_alien));
+        if(entity_valid(alien) && collide(g_spaceship_projectile, alien)) {
+            delete_entity_id(alien);
             delete_entity_id(g_spaceship_projectile);
             play_sound_buffer(g_sound_buffer_kill);
             g_dead_aliens++;
@@ -360,8 +355,8 @@ static void collide_user_proj(void)
                 update_alien_speeds();
                 g_alien_projectile_frequency
                     -= g_alien_projectile_frequency_decrement;
-                g_alien_projectile_frequency = my_lib::max<float64>(
-                    g_alien_projectile_frequency, 1);
+                g_alien_projectile_frequency = MAX(g_alien_projectile_frequency,
+                                                   1.0);
             }
             // TODO: find better solution, eventually the value will overflow
             // back here Don't delete alien, instead, keep it in matrix to mark
@@ -374,9 +369,12 @@ static void collide_user_proj(void)
 
 static void collide_alien_proj(void)
 {
-    for(uint64 i = 0; i < g_aliens_projectiles.get_size(); i++) {
-        if(entity_valid(g_aliens_projectiles[i])
-           && collide(g_spaceship_id, g_aliens_projectiles[i])) {
+    for(uint64 i = 0; i < array_get_size(&g_aliens_projectiles); i++) {
+        // TODO: Fix ugly cast with beautiful macro?
+        entity_id alien_projectile = *(
+            (entity_id*)array_get(&g_aliens_projectiles, i));
+        if(entity_valid(alien_projectile)
+           && collide(g_spaceship_id, alien_projectile)) {
             g_player_dead = true;
         }
     }
@@ -384,8 +382,10 @@ static void collide_alien_proj(void)
 
 static void collide_aliens_with_spaceship(void)
 {
-    for(uint64 i = 0; i < g_aliens.get_size(); i++) {
-        if(entity_valid(g_aliens[i]) && collide(g_spaceship_id, g_aliens[i])) {
+    for(uint64 i = 0; i < array_get_size(&g_aliens); i++) {
+        // TODO: Fix ugly cast with beautiful macro?
+        entity_id alien = *((entity_id*)array_get(&g_aliens, i));
+        if(entity_valid(alien) && collide(g_spaceship_id, alien)) {
             g_player_dead = true;
         }
     }
@@ -399,8 +399,8 @@ static void check_collisions(void)
         entity_id id = entity_id_array[i];
         if(entity_in_use[id.index]
            && ((components_used[id.index] & key) == key)) {
-            if(out_of_bounds(id, 0, g_screen_info->width_in_pixels, 0,
-                             g_screen_info->height_in_pixels)) {
+            if(out_of_bounds(id, 0, g_screen_info.width_in_pixels, 0,
+                             g_screen_info.height_in_pixels)) {
                 delete_entity_id(id);
             }
         }
@@ -411,7 +411,7 @@ static void check_collisions(void)
         collide_user_proj();
     }
 
-    if(g_aliens_projectiles.get_size() > 0) {
+    if(array_get_size(&g_aliens_projectiles) > 0) {
         collide_alien_proj();
     }
 
@@ -501,12 +501,14 @@ void game_init(const uint32 width_in_pixels, const uint32 height_in_pixels,
 
     const uint32_t bytes_per_pixel = 4;
 
-    g_screen_info = new screen_information(width_in_pixels, height_in_pixels,
-                                           pixel_size);
-    g_window = open_window(WINDOW_TITLE, g_screen_info->screen_width,
-                           g_screen_info->screen_height);
-    g_backbuffer = create_backbuffer(g_screen_info->screen_width,
-                                     g_screen_info->screen_height,
+    init_array(&g_aliens, ALIENS_ROWS * ALIENS_COLS);
+    init_array(&g_aliens_projectiles, MAX_ALIEN_PROJECTILES);
+
+    init_screen_info(&g_screen_info, width_in_pixels, height_in_pixels, pixel_size);
+    g_window = open_window(WINDOW_TITLE, g_screen_info.screen_width,
+                           g_screen_info.screen_height);
+    g_backbuffer = create_backbuffer(g_screen_info.screen_width,
+                                     g_screen_info.screen_height,
                                      bytes_per_pixel);
     const uint8 channels = 2;
     const uint32 nb_samples_per_sec = 44100;
@@ -518,7 +520,7 @@ void game_init(const uint32 width_in_pixels, const uint32 height_in_pixels,
         get_frames_from_time_sec(0.2f, nb_samples_per_sec));
     init_input();
     init_entity_system();
-    rng.init_seed32(SEED);
+    rand32_init(&rng, SEED);
 
     LOG_TRACE("Game init done\n");
 }
@@ -526,11 +528,12 @@ void game_init(const uint32 width_in_pixels, const uint32 height_in_pixels,
 void game_destroy(void)
 {
     LOG_TRACE("Destroying game\n");
+    free_array(&g_aliens);
+    free_array(&g_aliens_projectiles);
     destroy_window(g_window);
     destroy_backbuffer(g_backbuffer);
     destroy_sound_buffer(g_sound_buffer_shoot);
     destroy_sound_buffer(g_sound_buffer_kill);
-    delete g_screen_info;
     teardown_sound();
     teardown_input();
     LOG_TRACE("Destroyed game\n");
@@ -557,8 +560,8 @@ void process_input(float64 delta)
         }
     }
 
-    if(out_of_bounds(g_spaceship_id, 0, g_screen_info->width_in_pixels, 0,
-                     g_screen_info->height_in_pixels)) {
+    if(out_of_bounds(g_spaceship_id, 0, g_screen_info.width_in_pixels, 0,
+                     g_screen_info.height_in_pixels)) {
         positions[g_spaceship_id.index] = old_position;
     }
 }
@@ -577,8 +580,10 @@ static void clear_screen(platform_backbuffer* backbuffer, uint32 color)
 
 static bool player_won(void)
 {
-    for(uint64 i = 0; i < g_aliens.get_size(); i++) {
-        if(entity_valid(g_aliens[i])) {
+    for(uint64 i = 0; i < array_get_size(&g_aliens); i++) {
+        // TODO: Fix ugly cast with beautiful macro?
+        entity_id alien = *((entity_id*)array_get(&g_aliens,i));
+        if(entity_valid(alien)) {
             // alien still alive
             return false;
         }
@@ -599,8 +604,10 @@ static entity_id get_alien_to_shoot(void)
     int32 nb_visible_aliens = 0;
     for(int32 j = 0; j < ALIENS_COLS; j++) {
         for(int32 i = ALIENS_ROWS - 1; i >= 0; i--) {
-            if(entity_valid(g_aliens[i * ALIENS_COLS + j])) {
-                visible_aliens[nb_visible_aliens] = g_aliens[i * ALIENS_COLS + j];
+        // TODO: Fix ugly cast with beautiful macro?
+        entity_id alien = *((entity_id*)array_get(&g_aliens, i * ALIENS_COLS + j));
+            if(entity_valid(alien)) {
+                visible_aliens[nb_visible_aliens] = alien;
                 nb_visible_aliens++;
                 break;
             }
@@ -612,10 +619,13 @@ static entity_id get_alien_to_shoot(void)
         // TODO: Put newline automagically in assert macro
         ASSERT(false,
                "Current assumption: If all aliens are dead, game is won");
-        return { 0, 0 };
+        entity_id default_res;
+        default_res.index = 0;
+        default_res.version = 0;
+        return default_res;
     }
 
-    int32 idx = rng.rand_int32(0, nb_visible_aliens - 1);
+    int32 idx = rand32_rand_interval(&rng, 0, nb_visible_aliens - 1);
     return visible_aliens[idx];
 }
 
@@ -626,9 +636,12 @@ static void generate_alien_projectile(float64 delta,
     // Remove deleted projectiles
     // NOTE: Really don't like doing it like this
     uint64 i = 0;
-    while(i < g_aliens_projectiles.get_size()) {
-        if(!entity_valid(g_aliens_projectiles[i])) {
-            g_aliens_projectiles.delete_idx_fast(i);
+    while(i < array_get_size(&g_aliens_projectiles)) {
+        // TODO: Fix ugly cast with beautiful macro?
+        entity_id alien_projectile = *(
+            (entity_id*)array_get(&g_aliens_projectiles, i));
+        if(!entity_valid(alien_projectile)) {
+            array_delete_idx_fast(&g_aliens_projectiles, i);
             continue;
         }
         i++;
@@ -636,8 +649,8 @@ static void generate_alien_projectile(float64 delta,
 
     *alien_projectile_timer -= delta;
     if(*alien_projectile_timer < 0) {
-        if(g_aliens_projectiles.get_size()
-           < g_aliens_projectiles.get_capacity()) {
+        if(array_get_size(&g_aliens_projectiles)
+           < array_get_capacity(&g_aliens_projectiles)) {
 
             entity_id alien_to_shoot = get_alien_to_shoot();
 
@@ -645,11 +658,11 @@ static void generate_alien_projectile(float64 delta,
             uint32 proj_col = positions[alien_to_shoot.index].x
                               + sprites[alien_to_shoot.index].width / 2;
 
-            g_aliens_projectiles.add(
-                create_projectile(proj_row, proj_col, 0, -g_projectile_speed));
+            entity_id* new_projectile = (entity_id*)malloc(sizeof(entity_id));
+            *new_projectile = create_projectile(proj_row, proj_col, 0, -g_projectile_speed);
+            array_add(&g_aliens_projectiles, (void*)new_projectile);
             play_sound_buffer(g_sound_buffer_shoot);
         }
-
         *alien_projectile_timer = g_alien_projectile_frequency;
     }
 }
@@ -677,16 +690,18 @@ static void reset_game_state(float64* delta, float64* curr_time)
 static void update_alien_positions(void)
 {
     bool should_update = false;
-    for(uint64 i = 0; i < g_aliens.get_size(); i++) {
-        if(!entity_valid(g_aliens[i])) {
+    for(uint64 i = 0; i < array_get_size(&g_aliens); i++) {
+        // TODO: Fix ugly cast with beautiful macro?
+        entity_id alien = *((entity_id*)array_get(&g_aliens,i));
+        if(!entity_valid(alien)) {
             continue;
         }
         if(!g_next_alien_collision_side_left) {
             // collide with right side only
             // TODO: Find a better way to collide only with one side
-            if(out_of_bounds(g_aliens[i], -1,
-                             g_screen_info->width_in_pixels - 1, -1,
-                             g_screen_info->height_in_pixels + 1)) {
+            if(out_of_bounds(alien, -1,
+                             g_screen_info.width_in_pixels - 1, -1,
+                             g_screen_info.height_in_pixels + 1)) {
                 g_next_alien_collision_side_left = true;
                 should_update = true;
                 break;
@@ -694,8 +709,8 @@ static void update_alien_positions(void)
         } else {
             // collide with left side only
             // TODO: Find a better way to collide only with one side
-            if(out_of_bounds(g_aliens[i], 1, g_screen_info->width_in_pixels + 1,
-                             -1, g_screen_info->height_in_pixels + 1)) {
+            if(out_of_bounds(alien, 1, g_screen_info.width_in_pixels + 1,
+                             -1, g_screen_info.height_in_pixels + 1)) {
                 g_next_alien_collision_side_left = false;
                 should_update = true;
                 break;
@@ -704,12 +719,14 @@ static void update_alien_positions(void)
     }
 
     if(should_update) {
-        for(uint64 i = 0; i < g_aliens.get_size(); i++) {
-            if(!entity_valid(g_aliens[i])) {
+        for(uint64 i = 0; i < array_get_size(&g_aliens); i++) {
+        // TODO: Fix ugly cast with beautiful macro?
+        entity_id alien = *((entity_id*)array_get(&g_aliens,i));
+            if(!entity_valid(alien)) {
                 continue;
             }
-            directions[g_aliens[i].index].x *= -1;
-            positions[g_aliens[i].index].y += my_lib::max<uint32>(g_screen_info->pixel_size/2, 1);
+            directions[alien.index].x *= -1;
+            positions[alien.index].y += MAX(g_screen_info.pixel_size/2, 1U);
         }
     }
 }

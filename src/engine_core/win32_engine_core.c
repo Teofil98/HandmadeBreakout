@@ -1,43 +1,46 @@
-#include "include/defines.h"
-#include "include/hspaceinvaders.h"
+#include "../my_lib/defines.h"
+#include "../include/game.h"
 #include "include/platform_layer.h"
-#include "include/logging.h"
+#include "../my_lib/logging.h"
 #include "include/input.h"
 #include <objbase.h>
 #include <stdio.h> // TODO: Delete after testing done
 #include <windows.h>
 #include <xaudio2.h>
+#include <stdbool.h>
 
 // TODO: XINPUT handling for controller support
 
-struct platform_backbuffer_context {
+typedef struct platform_backbuffer_context {
     BITMAPINFO bm_info;
-};
+} platform_backbuffer_context;
 
-struct win32_window_size {
+typedef struct win32_window_size {
     uint32 width;
     uint32 height;
-};
+} win32_window_size;
 
-struct win32_xaudio2 {
+typedef struct win32_xaudio2 {
     IXAudio2* xaudio2;
     IXAudio2SourceVoice* source_voice;
     IXAudio2MasteringVoice* mastering_voice;
-};
+} win32_xaudio2;
 
-struct win32_context {
+typedef struct win32_context {
     HINSTANCE program_instance;
     WAVEFORMATEX wave_format;
-};
+} win32_context;
 
-struct platform_window_context {
+typedef struct platform_window_context {
     HWND window_handle;
     ATOM window_class;
-};
+} platform_window_context;
 
-struct platform_sound_buffer_context {
+typedef struct platform_sound_buffer_context {
     XAUDIO2_BUFFER buffer;
-};
+} platform_sound_buffer_context;
+
+// TODO: Setup xaudio2 callbacks
 
 // TODO: Global variables for now, see later if I want to change them
 static bool g_running;
@@ -46,10 +49,81 @@ static platform_backbuffer* g_backbuffer; // TODO: See when/if to free this
 // TODO: See when/if/how to free stuff inside this
 static win32_xaudio2 g_xaudio2;
 static win32_context g_context;
+static bool audio_busy;
 
 // TODO: This is also defined in Linux,
 // maybe move in common place
 key_state keys[NUM_KEYS];
+
+
+/************************ FROM tsherif/xaudio2-c-demo **********************/
+
+///////////////////////////////////////////////////////////
+// Set up callbacks for our source voice to track when it
+// finishes playing. We need to define all the callbacks,
+// so the rest are just stubs.
+///////////////////////////////////////////////////////////
+
+void OnBufferEnd(IXAudio2VoiceCallback* This, void* pBufferContext)    
+{
+    UNUSED(This);
+    UNUSED(pBufferContext);
+    audio_busy = false;
+}
+
+void OnStreamEnd(IXAudio2VoiceCallback* This) 
+{ 
+    UNUSED(This); 
+}
+
+void OnVoiceProcessingPassEnd(IXAudio2VoiceCallback* This) { UNUSED(This); }
+
+void OnVoiceProcessingPassStart(IXAudio2VoiceCallback* This,
+                                UINT32 SamplesRequired)
+{
+    UNUSED(This);
+    UNUSED(SamplesRequired);
+}
+
+void OnBufferStart(IXAudio2VoiceCallback* This, void* pBufferContext)
+{
+    UNUSED(This);
+    UNUSED(pBufferContext);
+}
+
+void OnLoopEnd(IXAudio2VoiceCallback* This, void* pBufferContext)
+{
+    UNUSED(This);
+    UNUSED(pBufferContext);
+}
+
+void OnVoiceError(IXAudio2VoiceCallback* This, void* pBufferContext,
+                  HRESULT Error)
+{
+    UNUSED(This);
+    UNUSED(pBufferContext);
+    UNUSED(Error);
+}
+
+///////////////////////////////////////////////////////////////
+// The trick to setting up callbacks in C is that the function
+// pointers go in the 'lpVtbl' property, which is of type 
+// IXAudio2VoiceCallbackVtbl*. (In C++, this is done by
+// inheriting from IXAudio2VoiceCallback.)
+///////////////////////////////////////////////////////////
+IXAudio2VoiceCallback xAudioCallbacks = {
+    .lpVtbl = &(IXAudio2VoiceCallbackVtbl) {
+        .OnStreamEnd = OnStreamEnd,
+        .OnVoiceProcessingPassEnd = OnVoiceProcessingPassEnd,
+        .OnVoiceProcessingPassStart = OnVoiceProcessingPassStart,
+        .OnBufferEnd = OnBufferEnd,
+        .OnBufferStart = OnBufferStart,
+        .OnLoopEnd = OnLoopEnd,
+        .OnVoiceError = OnVoiceError
+    }
+};
+/***********************************************************************/
+
 
 static win32_window_size win32_get_window_size(const HWND window)
 {
@@ -64,20 +138,18 @@ static win32_window_size win32_get_window_size(const HWND window)
 platform_backbuffer* create_backbuffer(const uint32 width, const uint32 height,
                                        const uint32 bytes_per_pixel)
 {
-    platform_backbuffer* backbuffer = new platform_backbuffer;
-    backbuffer->context = new platform_backbuffer_context;
+    platform_backbuffer* backbuffer = (platform_backbuffer*)malloc(sizeof(platform_backbuffer));
+    backbuffer->context = (platform_backbuffer_context*)malloc(sizeof(platform_backbuffer_context));
     backbuffer->width = width;
     backbuffer->height = height;
     backbuffer->bytes_per_pixel = bytes_per_pixel;
-    backbuffer->context->bm_info = {
-        .bmiHeader = { .biSize = sizeof(BITMAPINFOHEADER),
-                       .biWidth = (int32)width,
-                       // Negative height to create a top-down DIB
-                       .biHeight = -(int32)height,
-                       .biPlanes = 1,
-                       .biBitCount = 32,
-                       .biCompression = BI_RGB }
-    };
+    backbuffer->context->bm_info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    backbuffer->context->bm_info.bmiHeader.biWidth = (int32)width;
+    // Negative height to create a top-down DIB
+    backbuffer->context->bm_info.bmiHeader.biHeight = -(int32)height;
+    backbuffer->context->bm_info.bmiHeader.biPlanes = 1;
+    backbuffer->context->bm_info.bmiHeader.biBitCount = 32;
+    backbuffer->context->bm_info.bmiHeader.biCompression = BI_RGB;
     backbuffer->bitmap = VirtualAlloc(
         NULL, width * height * backbuffer->bytes_per_pixel,
         MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
@@ -92,8 +164,8 @@ void destroy_backbuffer(platform_backbuffer* backbuffer)
     if(!VirtualFree(backbuffer->bitmap, 0, MEM_RELEASE)) {
         LOG_ERROR("Failed to free allocated backbuffer\n");
     }
-    delete backbuffer->context;
-    delete backbuffer;
+    free(backbuffer->context);
+    free(backbuffer);
 }
 
 static void win32_display_backbuffer(const platform_backbuffer* backbuffer,
@@ -226,16 +298,24 @@ void win32_xaudio2_init(const WAVEFORMATEX* wave_format)
         LOG_ERROR("Error initializing xaudio2\n");
     }
 
-    result = g_xaudio2.xaudio2->CreateMasteringVoice(
-        &g_xaudio2.mastering_voice);
+    result = g_xaudio2.xaudio2->lpVtbl->CreateMasteringVoice(g_xaudio2.xaudio2,
+        &g_xaudio2.mastering_voice,
+        wave_format->nChannels,
+        wave_format->nSamplesPerSec,
+        0,
+        NULL,
+        NULL,
+        AudioCategory_GameEffects
+    );
     if(FAILED(result)) {
         LOG_ERROR("Error creating mastering voice\n");
     }
 
     // TODO: Later on maybe I want creating source voices to be a separate
     // function
-    result = g_xaudio2.xaudio2->CreateSourceVoice(&g_xaudio2.source_voice,
-                                                  wave_format);
+    result = g_xaudio2.xaudio2->lpVtbl->CreateSourceVoice(g_xaudio2.xaudio2, &g_xaudio2.source_voice,
+                                                  wave_format, 0, XAUDIO2_DEFAULT_FREQ_RATIO,
+                                                  &xAudioCallbacks, NULL, NULL);
     if(FAILED(result)) {
         LOG_ERROR("Error creating source voice.\n");
     }
@@ -281,8 +361,8 @@ platform_window* open_window(const char* title, const uint32 width,
     }
 
     // TODO: Set title
-    platform_window* plat_window = new platform_window;
-    plat_window->context = new platform_window_context;
+    platform_window* plat_window = (platform_window*)malloc(sizeof(platform_window));
+    plat_window->context = (platform_window_context*)malloc(sizeof(platform_window_context));
     plat_window->context->window_handle = window;
     plat_window->context->window_class = w_class_atom;
     // plat_window->width = width;
@@ -299,8 +379,8 @@ void destroy_window(platform_window* window)
     }
     // TODO: Class automatically unregistered when program terminates
     // See if I want to unregister manually
-    delete window->context;
-    delete window;
+    free(window->context);
+    free(window);
 }
 
 
@@ -345,16 +425,14 @@ void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
     const uint16 block_align = (nb_channels * bits_per_sample) / 8;
     const uint32 avg_bytes_per_sec = nb_samples_per_sec * block_align;
     UNUSED(name);
-    g_context.wave_format = {
-        .wFormatTag = WAVE_FORMAT_PCM, // TODO: See if this is the format I want
-                                       // to use
-        .nChannels = nb_channels,
-        .nSamplesPerSec = nb_samples_per_sec,
-        .nAvgBytesPerSec = avg_bytes_per_sec,
-        .nBlockAlign = block_align,
-        .wBitsPerSample = bits_per_sample,
-        .cbSize = 0
-    };
+    g_context.wave_format.wFormatTag
+        = WAVE_FORMAT_PCM; // TODO: See if this is the format I want to use
+    g_context.wave_format.nChannels = nb_channels;
+    g_context.wave_format.nSamplesPerSec = nb_samples_per_sec;
+    g_context.wave_format.nAvgBytesPerSec = avg_bytes_per_sec;
+    g_context.wave_format.nBlockAlign = block_align;
+    g_context.wave_format.wBitsPerSample = bits_per_sample;
+    g_context.wave_format.cbSize = 0;
 
     win32_xaudio2_init(&g_context.wave_format);
 }
@@ -371,14 +449,14 @@ void destroy_sound_buffer(platform_sound_buffer* sound_buffer)
     if(!VirtualFree(sound_buffer->buffer, 0, MEM_RELEASE)) {
         LOG_ERROR("Could not free allocated sound buffer\n");
     }
-    delete sound_buffer->context;
-    delete sound_buffer;
+    free(sound_buffer->context);
+    free(sound_buffer);
 }
 
 platform_sound_buffer* create_sound_buffer(uint32 size_frames)
 {
-    platform_sound_buffer* sound_buffer = new platform_sound_buffer;
-    sound_buffer->context = new platform_sound_buffer_context;
+    platform_sound_buffer* sound_buffer = (platform_sound_buffer*)malloc(sizeof(platform_sound_buffer));
+    sound_buffer->context = (platform_sound_buffer_context*)malloc(sizeof(platform_sound_buffer_context));
 
     // FIXME: Replace 4 with actual computation using knwon values
     const uint32 sound_buffer_size = size_frames * 4;
@@ -393,18 +471,15 @@ platform_sound_buffer* create_sound_buffer(uint32 size_frames)
     sound_buffer->nb_samples_per_sec = g_context.wave_format.nSamplesPerSec;
     sound_buffer->nb_channels = g_context.wave_format.nChannels;
     sound_buffer->size_bytes = sound_buffer_size;
-    sound_buffer->context->buffer = {
-        .Flags = 0,
-        .AudioBytes = sound_buffer_size,
-        .pAudioData = (uint8*)buffer,
-        .PlayBegin = 0,
-        .PlayLength = 0,
-        .LoopBegin = 0,
-        .LoopLength = 0,
-        .LoopCount = 0,
-        .pContext = NULL
-    };
-
+    sound_buffer->context->buffer.Flags = 0;
+    sound_buffer->context->buffer.AudioBytes = sound_buffer_size;
+    sound_buffer->context->buffer.pAudioData = (uint8*)buffer;
+    sound_buffer->context->buffer.PlayBegin = 0;
+    sound_buffer->context->buffer.PlayLength = 0;
+    sound_buffer->context->buffer.LoopBegin = 0;
+    sound_buffer->context->buffer.LoopLength = 0;
+    sound_buffer->context->buffer.LoopCount = 0;
+    sound_buffer->context->buffer.pContext = NULL;
 
     return sound_buffer;
 }
@@ -413,13 +488,19 @@ void play_sound_buffer(platform_sound_buffer* sound_buffer)
 {
     // TODO: Probably want submitting a buffer and playing to be one or more
     // separate functions
-    HRESULT result = g_xaudio2.source_voice->SubmitSourceBuffer(
-        &sound_buffer->context->buffer);
+    
+    // FIXME: DO I NEED THIS?
+    //while(audio_busy) {}
+
+    HRESULT result = g_xaudio2.source_voice->lpVtbl->SubmitSourceBuffer(g_xaudio2.source_voice, &sound_buffer->context->buffer, NULL);
     if(FAILED(result)) {
         LOG_ERROR("Error submitting sound buffer to source voice. Error_core: 0x%lx\n", result);
+    } else {
+        audio_busy = true;
     }
 
-    result = g_xaudio2.source_voice->Start(0);
+    result = g_xaudio2.source_voice->lpVtbl->Start(g_xaudio2.source_voice, 0,
+                                                   XAUDIO2_COMMIT_NOW);
     if(FAILED(result)) {
         LOG_ERROR("Error playing sound buffer on source voice\n");
     }

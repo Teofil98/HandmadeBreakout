@@ -684,6 +684,14 @@ static void reset_game_state(float64* delta, float64* curr_time)
         }
     }
 
+	// free aliens and projectile arrays and reinitialize them
+	
+    free_array(&g_aliens);
+    free_array(&g_aliens_projectiles);
+
+    init_array(&g_aliens, ALIENS_ROWS * ALIENS_COLS);
+    init_array(&g_aliens_projectiles, MAX_ALIEN_PROJECTILES);
+
     g_spaceship_id = create_spaceship();
     create_alien_matrix();
 }

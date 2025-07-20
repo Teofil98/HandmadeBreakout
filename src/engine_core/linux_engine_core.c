@@ -122,6 +122,7 @@ void destroy_window(platform_window* window)
 {
     free(window->title);
 
+	XAutoRepeatOn(g_display_server);
     XUnmapWindow(g_display_server, window->context->window);
     XDestroyWindow(g_display_server, window->context->window);
     XCloseDisplay(g_display_server);

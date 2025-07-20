@@ -23,6 +23,7 @@ Breakout game made from scratch (as much as possible)
 
 - [X] Windows port
 - [ ] Restore Logging
+- [ ] Valgrind external lib ignore
 - [ ] Fix memory leaks
 - [ ] Implement generic DSes with macros instead of void pointers
 - [ ] Code cleanup

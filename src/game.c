@@ -1,4 +1,5 @@
 #include "include/game.h"
+#include "engine_core/include/engine_core.h"
 #include "my_lib/defines.h"
 #include "ECS/include/entities.h"
 #include "engine_core/include/input.h"
@@ -18,24 +19,6 @@
 #define MAX_ALIEN_PROJECTILES 3
 #define INITIAL_PROJECTILE_FREQ 2
 #define INITIAL_ALIEN_SPEED 15
-
-typedef struct screen_information {
-    uint32 width_in_pixels;
-    uint32 height_in_pixels;
-    uint32 pixel_size;
-    uint32 screen_width;
-    uint32 screen_height;
-} screen_information;
-
-static void init_screen_info(screen_information* info, uint32 width_in_px,
-                             uint32 height_in_px, uint32 px_size)
-{
-    info->width_in_pixels = width_in_px;
-    info->height_in_pixels = height_in_px;
-    info->pixel_size = px_size;
-    info->screen_width = width_in_px * px_size;
-    info->screen_height = height_in_px * px_size;
-}
 
 static screen_information g_screen_info;
 
@@ -74,15 +57,12 @@ static int32 g_alien_speed = INITIAL_ALIEN_SPEED;
 static int32 g_alien_speed_increment = 15;
 static int32 g_dead_aliens = 0;
 static entity_id g_spaceship_id;
-//static array<entity_id, ALIENS_ROWS * ALIENS_COLS> g_aliens;
 static array g_aliens;
-//static my_lib::array<entity_id, MAX_ALIEN_PROJECTILES> g_aliens_projectiles;
 static array g_aliens_projectiles;
 static float64 g_alien_projectile_frequency = INITIAL_PROJECTILE_FREQ;
 static float64 g_alien_projectile_frequency_decrement = 0.5;
 static bool g_next_alien_collision_side_left = false;
 static entity_id g_spaceship_projectile;
-// static entity_id aliens[ALIENS_ROWS * ALIENS_COLS];
 static const uint32 g_alien_width = 10;
 static const uint32 g_alien_height = 8;
 static bool g_player_dead = false;
@@ -100,7 +80,7 @@ static entity_id create_spaceship(void)
     entity_id id = get_new_entity_id();
 
     position_component pos;
-    pos.x = g_screen_info.width_in_pixels/2;
+    pos.x = g_screen_info.width_in_pixels/2.0;
     pos.y = g_screen_info.height_in_pixels - 10;
 
     sprite_component sprt;
@@ -154,7 +134,6 @@ static entity_id create_alien(const uint32 row, const uint32 col)
 
     return id;
 }
-
 
 static void create_alien_matrix(void)
 {
@@ -210,31 +189,6 @@ static entity_id create_projectile(const uint32 row, const uint32 col,
     return id;
 }
 
-static void draw_pixel(platform_backbuffer* backbuffer, const uint32 row,
-                       const uint32 col, const uint32 color)
-{
-    ASSERT(row < g_screen_info.height_in_pixels,
-           "Attempting to draw pixel on row %d with a screen height of %d\n",
-           row, g_screen_info.height_in_pixels);
-    ASSERT(col < g_screen_info.width_in_pixels,
-           "Attempting to draw pixel on col %d with a screen width of %d\n",
-           col, g_screen_info.width_in_pixels);
-
-    uint32_t* pixels = (uint32_t*)backbuffer->bitmap;
-    const uint32 nb_cols = backbuffer->width;
-
-    const uint32_t screen_row = row * g_screen_info.pixel_size;
-    const uint32_t screen_col = col * g_screen_info.pixel_size;
-
-    for(uint32 i = screen_row; i < screen_row + g_screen_info.pixel_size;
-        i++) {
-        for(uint32 j = screen_col; j < screen_col + g_screen_info.pixel_size;
-            j++) {
-            pixels[i * nb_cols + j] = color;
-        }
-    }
-}
-
 static void draw_sprite(const entity_id id, platform_backbuffer* backbuffer)
 {
     uint32 height = sprites[id.index].height;
@@ -247,7 +201,7 @@ static void draw_sprite(const entity_id id, platform_backbuffer* backbuffer)
     for(uint32 i = 0; i < height; i++) {
         for(uint32 j = 0; j < width; j++) {
             if(sprite[width * i + j] == '*') {
-                draw_pixel(backbuffer, entity_row + i, entity_col + j, color);
+                draw_pixel(backbuffer, entity_row + i, entity_col + j, color, &g_screen_info);
             }
         }
     }
@@ -432,67 +386,6 @@ static void update_entity_positions(float64 delta)
     }
 }
 
-void draw_gradient(const platform_backbuffer* backbuffer,
-                   const uint32 row_offset, const uint32 col_offset)
-{
-    uint32_t* pixels = (uint32_t*)backbuffer->bitmap;
-    const uint32 nb_rows = backbuffer->height;
-    const uint32 nb_cols = backbuffer->width;
-    for(uint32 row = 0; row < nb_rows; row++) {
-        for(uint32 col = 0; col < nb_cols; col++) {
-            pixels[(row * nb_cols) + col] = RGBA(0, (uint8)(row + row_offset),
-                                                 (uint8)(col + col_offset), 0);
-        }
-    }
-}
-
-// FIXME: Certain frequencies produce audible skip
-void write_square_wave(platform_sound_buffer* buffer, const uint32 frequency,
-                       const int tone_volume)
-{
-    // TODO: Consider if I want to have non 16b/sample  audio
-    // TODO: xaudio2_buffer->NbBytes should be multiple of 2, maybe assert
-    uint16* audio_buffer = (uint16*)buffer->buffer;
-    int32 nb_samples = (int32)buffer->size_bytes / 2;
-    // TODO:  For now, I assume that the buffer lasts for 1 second
-    // FIXME: Deal with buffers that have length more than 1 sec
-    const uint32 square_wave_period = nb_samples / frequency;
-    const uint32 half_period = square_wave_period / 2;
-
-    for(int i = 0; i < nb_samples; i += 2) {
-        int sign = (i / half_period) % 2 == 0 ? 1 : -1;
-        // set left and right samples
-        audio_buffer[i] = sign * tone_volume;
-        audio_buffer[i + 1] = sign * tone_volume;
-    }
-}
-
-// FIXME: Certain frequencies produce audible skip
-void write_sin_wave(platform_sound_buffer* buffer, const uint32 frequency,
-                    const int tone_volume)
-{
-    // TODO: Consider if I want to have non 16b/sample  audio
-    // TODO: xaudio2_buffer->NbBytes should be multiple of 2, maybe assert
-    uint16* audio_buffer = (uint16*)buffer->buffer;
-    int32 nb_samples = (int32)buffer->size_bytes / 2;
-    const uint32 wave_period = buffer->nb_samples_per_sec / frequency;
-
-    for(int i = 0; i < nb_samples; i += 2) {
-        // Where in the sin wave we are, in radians
-        float32 sin_location = 2 * PI
-                               * ((i % wave_period) / (float32)wave_period);
-        float32 sin_value = sinf(sin_location);
-        // set left and right samples
-        audio_buffer[i] = (uint16)(sin_value * tone_volume);
-        audio_buffer[i + 1] = (uint16)(sin_value * tone_volume);
-    }
-}
-
-
-static uint32 get_frames_from_time_sec(float32 time, uint32 samples_per_second)
-{
-    return (uint32)(time * samples_per_second);
-}
 
 void game_init(const uint32 width_in_pixels, const uint32 height_in_pixels,
                const uint32 pixel_size)
@@ -726,7 +619,7 @@ static void update_alien_positions(void)
                 continue;
             }
             directions[alien.index].x *= -1;
-            positions[alien.index].y += MAX(g_screen_info.pixel_size/2, 1U);
+            positions[alien.index].y += MAX(g_screen_info.pixel_size/2.0, 1U);
         }
     }
 }

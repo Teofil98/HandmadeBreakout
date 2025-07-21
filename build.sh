@@ -24,6 +24,7 @@ fi
 mkdir -p build
 pushd build
 gcc $flags -std=c99 -g ../src/engine_core/linux_engine_core.c \
+			    ../src/engine_core/common_engine_core.c \
                             ../src/game.c \
                             ../src/ECS/entities.c \
                             -lX11 -lpulse-simple -lpulse -lpthread -lm\

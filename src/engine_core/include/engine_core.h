@@ -13,13 +13,21 @@ typedef struct screen_information {
     uint32 screen_height;
 } screen_information;
 
-void init_screen_info(screen_information* info, const uint32 width_in_px, const uint32 height_in_px, const uint32 px_size);
-void draw_pixel(platform_backbuffer* backbuffer, const uint32 row, const uint32 col, const uint32 color, const screen_information* info);
+void init_screen_info(screen_information* info, const uint32 width_in_px,
+                      const uint32 height_in_px, const uint32 px_size);
+void draw_pixel(platform_backbuffer* backbuffer, const uint32 row,
+                const uint32 col, const uint32 color,
+                const screen_information* info);
 
-void write_square_wave(platform_sound_buffer* buffer, uint32 frequency, int32 tone_volume);
-void write_sin_wave(platform_sound_buffer* buffer, const uint32 frequency, const int32 tone_volume);
-inline uint32 get_frames_from_time_sec(const float32 time, const uint32 samples_per_second)
+void write_square_wave(platform_sound_buffer* buffer, uint32 frequency,
+                       int32 tone_volume);
+void write_sin_wave(platform_sound_buffer* buffer, const uint32 frequency,
+                    const int32 tone_volume);
+
+inline uint32 get_frames_from_time_sec(const float32 time,
+                                       const uint32 samples_per_second)
 {
     return (uint32)(time * samples_per_second);
 }
-#endif
+
+#endif // ENGINE_CORE_H

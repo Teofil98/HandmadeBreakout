@@ -1,17 +1,21 @@
-#pragma once
+// clang-format Language: C
+#ifndef PLATFORM_LAYER_H
+#define PLATFORM_LAYER_H
 
 #include "../../my_lib/defines.h"
 
 struct platform_window_context;
+
 typedef struct platform_window {
     char* title;
     // TODO: See what I want to do with width and height when window is resized
-    //uint32 width;
-    //uint32 height;
+    // uint32 width;
+    // uint32 height;
     struct platform_window_context* context;
 } platform_window;
 
 struct platform_backbuffer_context;
+
 typedef struct platform_backbuffer {
     uint32 bytes_per_pixel;
     void* bitmap;
@@ -21,26 +25,31 @@ typedef struct platform_backbuffer {
 } platform_backbuffer;
 
 struct platform_sound_buffer_context;
+
 typedef struct platform_sound_buffer {
     uint32 nb_samples_per_sec;
     uint8 bits_per_sample;
     void* buffer;
     uint32 size_bytes;
     uint8 nb_channels;
-	uint32 size_frames;
+    uint32 size_frames;
     struct platform_sound_buffer_context* context;
 } platform_sound_buffer;
 
-platform_window* open_window(const char* title, const uint32 width, const uint32 height);
+platform_window* open_window(const char* title, const uint32 width,
+                             const uint32 height);
 void destroy_window(platform_window* window);
 
-platform_backbuffer* create_backbuffer(const uint32 width, const uint32 height, const uint32 bytes_per_pixel);
+platform_backbuffer* create_backbuffer(const uint32 width, const uint32 height,
+                                       const uint32 bytes_per_pixel);
 void destroy_backbuffer(platform_backbuffer* backbuffer);
-void display_backbuffer(const platform_backbuffer* backbuffer, const platform_window* window);
+void display_backbuffer(const platform_backbuffer* backbuffer,
+                        const platform_window* window);
 
 // TODO: Do I want separate init and create buffer functions?
 // TODO: Init should probably return an error if it fails
-void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec, const uint8 bits_per_sample, const char* name);
+void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
+                const uint8 bits_per_sample, const char* name);
 platform_sound_buffer* create_sound_buffer(const uint32 size_frames);
 void destroy_sound_buffer(platform_sound_buffer* sound_buffer);
 void play_sound_buffer(platform_sound_buffer* sound_buffer);
@@ -52,3 +61,5 @@ void teardown_input(void);
 float64 get_time_ms(void);
 
 void poll_platform_messages(void);
+
+#endif // PLATFORM_LAYER_H

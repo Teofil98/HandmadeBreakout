@@ -1,4 +1,6 @@
-#pragma once
+// clang-format Language: C
+#ifndef INPUT_H
+#define INPUT_H
 
 #include <stdbool.h>
 
@@ -14,7 +16,6 @@ typedef enum key_id {
     NUM_KEYS
 } key_id;
 
-
 typedef struct key_state {
     bool pressed;
     bool held;
@@ -22,3 +23,5 @@ typedef struct key_state {
 } key_state;
 
 extern key_state keys[NUM_KEYS];
+
+#endif // INPUT_H

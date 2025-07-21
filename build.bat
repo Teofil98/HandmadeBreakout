@@ -1,10 +1,41 @@
 @echo off
-mkdir build
+
+:: Check number of arguments
+if "%1"=="" (
+    echo Error! Wrong number of arguments.
+    goto usage
+)
+
+if "%1"=="release" (
+    set "flags=-O3"
+    set "link_flags="
+) else if "%1"=="debug" (
+    set "flags=-Wall -Wextra -Werror -fsanitize=address -fsanitize=undefined"
+    set "link_flags="
+) else (
+    echo Error! Unknown argument "%1". Expected "debug" or "release"
+    goto usage
+)
+
+:: Make sure build directory exists
+if not exist build (
+    mkdir build
+)
+
 pushd build
-g++ -Wall -Wextra -Werror -pedantic -std=c++20 -g ^
-                    ../src/win32_hspaceinvaders.cpp ^
-                    ../src/hspaceinvaders.cpp ^
-                    ../src/entities.cpp ^
-                    -o ../win32_hspaceinvaders.exe ^
-                    -lgdi32 -lole32 -lxaudio2_9
+
+gcc %flags% -std=c99 -g ^
+                    ../src/engine_core/win32_engine_core.c ^
+                    ../src/game.c ^
+                    ../src/ECS/entities.c ^
+                    -lgdi32 -lole32 -lxaudio2_9 ^
+                    %link_flags% ^
+                    -o ../win32_hspaceinvaders.exe 
+
 popd
+exit /b 0
+
+:: FUNCTIONS
+:usage
+echo Usage: %~nx0 [release/debug]
+exit /b 1

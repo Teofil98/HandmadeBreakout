@@ -22,6 +22,7 @@ extern bool entity_in_use[MAX_ENTITIES];
 extern uint64 components_used[MAX_ENTITIES];
 
 void init_entity_system(void);
+void teardown_entity_system(void);
 entity_id get_new_entity_id(void);
 void delete_entity_id(entity_id id);
 bool entity_valid(entity_id id);

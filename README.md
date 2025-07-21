@@ -1,31 +1,30 @@
-# HandmadeSpaceInvaders
+# HandmadeBreakout
 
-Space Invaders game made from scratch (as much as possible)
+Breakout game made from scratch (as much as possible)
 
 ## Building and running
 
 ### Linux
 
 ```
-./build.sh
-./linux_hspaceinvaders.elf
+./build.sh release
+./linux_game.elf
 ```
 
 ### Windows
 ```
-.\build.bat
-.\win32_hspaceinvaders.exe
+.\build.bat release
+.\win32_game.exe
 ```
 
 ### Controls
-- `A`/`D` - move left/right
-- `Space` - shoot
-- `R` - restart game
-- `ESC` - close game
 
 ## TODO
 
 - [X] Windows port
+- [ ] Restore Logging
+- [ ] Valgrind external lib ignore
+- [ ] Fix memory leaks
+- [ ] Implement generic DSes with macros instead of void pointers
 - [ ] Code cleanup
-- [ ] Makefile
 - [ ] Replace stdlib

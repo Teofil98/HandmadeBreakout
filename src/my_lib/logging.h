@@ -5,6 +5,7 @@
 #include <stdarg.h> // TODO: Delete once testing done
 #include <stdio.h>  // TODO: Delete later
 #include <stdlib.h> // TODO: Delete later
+#include <stdbool.h>
 
 static void _vlog_print(const char* error_type, const char* filename,
                         const int32 line, const char* frmat, va_list args)

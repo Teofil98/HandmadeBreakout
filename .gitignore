@@ -2,4 +2,5 @@
 *.elf
 *.o
 *.obj
+*.txt
 build/*

@@ -30,6 +30,11 @@ void init_entity_system(void)
     }
 }
 
+void teardown_entity_system(void)
+{
+	free_stack(&available_entity_ids);
+}
+
 entity_id get_new_entity_id(void)
 {
     entity_id* old_id = (entity_id*)stack_pop(&available_entity_ids);

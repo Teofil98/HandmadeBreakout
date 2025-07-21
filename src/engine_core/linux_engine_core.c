@@ -93,6 +93,7 @@ platform_window* open_window(const char* title, const uint32 width,
     XAutoRepeatOff(g_display_server);
 
     XTextProperty window_title_propery;
+	// TODO: This is ugly!
     uint32 title_size = strlen(title);
     char* title_cpy = (char*)malloc(sizeof(int8) * (title_size + 1));
     strncpy(title_cpy, title, title_size);
@@ -120,11 +121,15 @@ platform_window* open_window(const char* title, const uint32 width,
 
 void destroy_window(platform_window* window)
 {
-    free(window->title);
-
+	XAutoRepeatOn(g_display_server);
+	XFreeGC(g_display_server, window->context->gc);
     XUnmapWindow(g_display_server, window->context->window);
     XDestroyWindow(g_display_server, window->context->window);
     XCloseDisplay(g_display_server);
+
+    free(window->title);
+	free(window->context);
+	free(window);
 }
 
 platform_backbuffer* create_backbuffer(const uint32 width, const uint32 height,
@@ -306,9 +311,10 @@ void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
         LOG_ERROR("Sound: Error, unknown PCM format (bits per sample)\n");
     }
     // Configure sample format
-    const pa_sample_spec ss = { .format = format,
-                                .rate = nb_samples_per_sec,
-                                .channels = (uint8)nb_channels };
+    pa_sample_spec ss; 
+	ss.format = format;
+    ss.rate = nb_samples_per_sec;
+    ss.channels = (uint8)nb_channels;
 
     int32 error;
     /* Create a new playback stream */

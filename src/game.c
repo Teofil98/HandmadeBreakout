@@ -423,6 +423,7 @@ void game_destroy(void)
     LOG_TRACE("Destroying game\n");
     free_array(&g_aliens);
     free_array(&g_aliens_projectiles);
+	teardown_entity_system();
     destroy_window(g_window);
     destroy_backbuffer(g_backbuffer);
     destroy_sound_buffer(g_sound_buffer_shoot);
@@ -575,6 +576,14 @@ static void reset_game_state(float64* delta, float64* curr_time)
             delete_entity_id(entity_id_array[i]);
         }
     }
+
+	// free aliens and projectile arrays and reinitialize them
+	
+    free_array(&g_aliens);
+    free_array(&g_aliens_projectiles);
+
+    init_array(&g_aliens, ALIENS_ROWS * ALIENS_COLS);
+    init_array(&g_aliens_projectiles, MAX_ALIEN_PROJECTILES);
 
     g_spaceship_id = create_spaceship();
     create_alien_matrix();

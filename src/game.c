@@ -8,7 +8,6 @@
 #include "my_lib/array.h"
 #include "my_lib/rand.h"
 #include "my_lib/utils.h"
-#include <math.h> // TODO: replace functions here with own implementation
 
 // GENERAL TODO: Check all return values of all functions and log errors where
 // needed. I Probably missed a few places so far in ALL SOURCE FILES SO FAR :)

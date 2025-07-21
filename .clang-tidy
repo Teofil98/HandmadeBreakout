@@ -18,4 +18,7 @@ Checks: >
   -readability-uppercase-literal-suffix,
   -readability-redundant-casting,
   -readability-math-missing-parentheses,
+  -readability-avoid-const-params-in-decls,
+  -altera-struct-pack-align,
+  -performance-enum-size,
   -misc-non-private-member-variables-in-classes,

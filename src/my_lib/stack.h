@@ -31,14 +31,14 @@ static inline void free_stack(stack* s)
 
 static inline void stack_push(stack* s, void* val)
 {
-    ASSERT(s->top < N, "Pushing on full stack! Stack overflow!");
+    ASSERT(s->top < s->size, "Pushing on full stack! Stack overflow!");
     s->data[s->top] = val;
     s->top++;
 }
 
 static inline void* stack_pop(stack* s)
 {
-    ASSERT(top > 0, "Trying to pop empty stack!");
+    ASSERT(s->top > 0, "Trying to pop empty stack!");
     void* val = s->data[s->top - 1];
     s->top--;
     return val;

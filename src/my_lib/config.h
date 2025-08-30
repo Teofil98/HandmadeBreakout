@@ -1,6 +1,6 @@
 #pragma once
 
-#define ENABLE_ERRORS 0
-#define ENABLE_WARNINGS 0
-#define ENABLE_TRACE 0
-#define ENABLE_ASSERTS 0
+#define ENABLE_ERRORS 1
+#define ENABLE_WARNINGS 1
+#define ENABLE_TRACE 1
+#define ENABLE_ASSERTS 1

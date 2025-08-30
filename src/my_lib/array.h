@@ -13,7 +13,7 @@ typedef struct array {
 
 static inline void array_add(array* a, void* val)
 {
-    ASSERT(size < N, "Array full!\n");
+    ASSERT(a->size < a->capacity, "Array full!\n");
     a->elements[a->size] = val;
     (a->size)++;
 }
@@ -21,7 +21,7 @@ static inline void array_add(array* a, void* val)
 // Fast delete, changes the relative order of the elements
 static inline void array_delete_idx_fast(array* a, uint64 idx)
 {
-    ASSERT(idx < size, "Array buffer overflow!\n");
+    ASSERT(idx < a->size, "Array buffer overflow!\n");
     // ASSERT(idx >= 0, "Trying to delete negative index!\n");
     free(a->elements[idx]);
     a->elements[idx] = a->elements[a->size - 1];
@@ -37,7 +37,7 @@ static inline void array_set(array* a, uint64 idx, void* val)
 
 static inline void array_resize(array* a, uint64 new_size)
 {
-    ASSERT(new_size <= N, "Trying to resize outside of array bounds\n");
+    ASSERT(new_size <= a->capacity, "Trying to resize outside of array bounds\n");
     a->size = new_size;
 }
 

@@ -1,5 +1,6 @@
 #include "include/entities.h"
 #include "../my_lib/stack.h"
+#include "../engine_core/include/engine_core.h"
 
 position_component positions[MAX_ENTITIES];
 sprite_component sprites[MAX_ENTITIES];
@@ -58,4 +59,109 @@ void delete_entity_id(entity_id id)
 bool entity_valid(entity_id id)
 {
     return id.version == entity_id_array[id.index].version;
+}
+
+void draw_sprite(const entity_id id, platform_backbuffer* backbuffer,
+                 screen_information* screen_info)
+{
+    uint32 height = sprites[id.index].height;
+    uint32 width = sprites[id.index].width;
+    const uint8* sprite = sprites[id.index].sprite;
+    uint32 color = sprites[id.index].color;
+    uint32 entity_row = (uint32)positions[id.index].y;
+    uint32 entity_col = (uint32)positions[id.index].x;
+
+    for(uint32 i = 0; i < height; i++) {
+        for(uint32 j = 0; j < width; j++) {
+            if(sprite[width * i + j] == '*') {
+                draw_pixel(backbuffer, entity_row + i, entity_col + j, color,
+                           screen_info);
+            }
+        }
+    }
+}
+
+void draw_sprites(platform_backbuffer* backbuffer,
+                  screen_information* screen_info)
+{
+    for(uint64 i = 0; i < MAX_ENTITIES; i++) {
+        entity_id id = entity_id_array[i];
+        if(entity_in_use[id.index]) {
+            draw_sprite(id, backbuffer, screen_info);
+        }
+    }
+}
+
+bool out_of_bounds(entity_id id, float32 left_lim, float32 right_lim,
+                          float32 top_lim, float32 bottom_lim)
+{
+    position_component top_left = positions[id.index];
+    position_component bottom_right;
+    bottom_right.x = positions[id.index].x + bounding_boxes[id.index].width - 1;
+    bottom_right.y = positions[id.index].y + bounding_boxes[id.index].height- 1;
+
+    // check out of bounds with the top
+    if(top_left.y < top_lim) {
+        return true;
+    }
+
+    // check out of bounds with the bottom
+    if(bottom_right.y >= bottom_lim) {
+        return true;
+    }
+
+    // check out of bounds with left side
+    if(top_left.x < left_lim) {
+        return true;
+    }
+
+    // NOTE: >= because of how arrays work
+    // not sure if this logic should be here or when calling
+
+    // check out of bounds with right side
+    if(bottom_right.x >= right_lim) {
+        return true;
+    }
+
+    return false;
+}
+
+bool collide(entity_id obj1, entity_id obj2)
+{
+    uint64 key = BBOX_COMP | POSITION_COMP;
+    ASSERT((components_used[obj1.index] & key) == key,
+           "Trying to perform collisions on an object that has no bounding box "
+           "or position! (first object in collision - entity_id: %ld)\n",
+           obj1);
+    ASSERT((components_used[obj2.index] & key) == key,
+           "Trying to perform collisions on an object that has no bounding box "
+           "or position! (second object in collision - entity_id: %ld)\n",
+           obj2);
+
+    bounding_box_component bbox1 = bounding_boxes[obj1.index];
+    bounding_box_component bbox2 = bounding_boxes[obj2.index];
+
+    position_component pos1 = positions[obj1.index];
+    position_component pos2 = positions[obj2.index];
+
+    // check if there are collisions on both X and Y axes since we are using
+    // AABB
+    return (pos1.x + bbox1.width >= pos2.x
+            && pos2.x + bbox2.width >= pos1.x
+            && pos1.y + bbox1.height >= pos2.y
+            && pos2.y + bbox2.height >= pos1.y);
+}
+
+void update_entity_positions(float64 delta)
+{
+    uint64 key = POSITION_COMP | DIRECTION_COMP;
+
+    for(uint64 i = 0; i < MAX_ENTITIES; i++) {
+        entity_id id = entity_id_array[i];
+        if(entity_in_use[id.index]
+           && ((components_used[id.index] & key) == key)) {
+            positions[id.index].x += (directions[id.index].x * delta);
+            positions[id.index].y += (directions[id.index].y * delta);
+        }
+    }
 }

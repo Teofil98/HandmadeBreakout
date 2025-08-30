@@ -2,6 +2,8 @@
 
 #include "components.h"
 #include "../../my_lib/defines.h"
+#include "../../engine_core/include/platform_layer.h"
+#include "../../engine_core/include/engine_core.h"
 #include <stdbool.h>
 
 #define MAX_ENTITIES 100
@@ -26,3 +28,9 @@ void teardown_entity_system(void);
 entity_id get_new_entity_id(void);
 void delete_entity_id(entity_id id);
 bool entity_valid(entity_id id);
+
+void draw_sprite(const entity_id id, platform_backbuffer* backbuffer, screen_information* screen_info);
+void draw_sprites(platform_backbuffer* backbuffer, screen_information* screen_info);
+bool out_of_bounds(entity_id id, float32 left_lim, float32 right_lim, float32 top_lim, float32 bottom_lim);
+bool collide(entity_id obj1, entity_id obj2);
+void update_entity_positions(float64 delta);

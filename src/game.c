@@ -283,7 +283,7 @@ static void check_collisions(void)
     collide_aliens_with_spaceship();
 }
 
-void game_init(const uint32 width_in_pixels, const uint32 height_in_pixels,
+void engine_init(const uint32 width_in_pixels, const uint32 height_in_pixels,
                const uint32 pixel_size)
 {
     LOG_TRACE("Game init\n");
@@ -329,7 +329,7 @@ void game_destroy(void)
     LOG_TRACE("Destroyed game\n");
 }
 
-void process_input(float64 delta)
+void process_input(const float64 delta)
 {
     position_component old_position = positions[g_spaceship_id.index];
     if(keys[KEY_A].held) {
@@ -457,12 +457,10 @@ static void generate_alien_projectile(float64 delta,
     }
 }
 
-static void reset_game_state(float64* delta, float64* curr_time)
+static void reset_game_state()
 {
     g_player_dead = false;
     g_next_alien_collision_side_left = false;
-    *delta = 0;
-    *curr_time = get_time_ms();
     g_dead_aliens = 0;
     g_alien_speed = INITIAL_ALIEN_SPEED;
     g_alien_projectile_frequency = INITIAL_PROJECTILE_FREQ;
@@ -529,60 +527,88 @@ static void update_alien_positions(void)
     }
 }
 
-// TODO: Add a "remove_dead_aliens" functions
-// which I would call at the beginning of the loop
-// and remove all other explicit dead alien checks from code
-void game_main(void)
+//-------------------------------------------------------------------------------
+float64 g_alien_projectile_timer;
+// Called when the game starts
+void on_init()
 {
-    game_init(128, 130, 8);
     write_sin_wave(g_sound_buffer_shoot, 300, 1600);
     write_sin_wave(g_sound_buffer_kill, 500, 1600);
-    float64 last_measurement = get_time_ms();
-    // TODO: What should be the first value of delta?
-    float64 delta = 0;
     g_spaceship_id = create_spaceship();
     create_alien_matrix();
+    g_alien_projectile_timer = g_alien_projectile_frequency;
+}
+
+
+
+bool g_quit = false;
+
+void engine_quit()
+{
+    g_quit = true;
+}
+
+
+// Called every frame
+void on_update(const float64 delta)
+{
+    if(keys[KEY_ESC].pressed) {
+        engine_quit();
+        return;
+    }
+
+    // reset game state if R is pressed
+    if(keys[KEY_R].pressed) {
+        reset_game_state();
+        return;
+    }
+
+    // check if the game has ended
+    if(player_won()) {
+        clear_screen(g_backbuffer, COLOR_GREEN);
+        return;
+    }
+
+    if(player_lost()) {
+        clear_screen(g_backbuffer, COLOR_RED);
+        return;
+    }
+
+    process_input(delta);
+    update_alien_positions();
+    update_entity_positions(delta);
+    generate_alien_projectile(delta, &g_alien_projectile_timer);
+    check_collisions();
+    draw_sprites(g_backbuffer, &g_screen_info);
+}
+
+// Called once when the engine_quit() function is called
+void on_cleanup()
+{
+    game_destroy();
+}
+
+void engine_start()
+{
+    // TODO: What should be the first value of delta?
+    float64 delta = 0;
     float64 avg_fps = 0;
-    float64 alien_projectile_timer = g_alien_projectile_frequency;
-    while(!keys[KEY_ESC].pressed) {
+    g_quit = false;
 
-        // reset game state if R is pressed
-        if(keys[KEY_R].pressed) {
-            reset_game_state(&delta, &last_measurement);
-        }
-
-        // check if the game has ended
-        if(player_won()) {
-            clear_screen(g_backbuffer, COLOR_GREEN);
-            poll_platform_messages();
-            display_backbuffer(g_backbuffer, g_window);
-            continue;
-        }
-
-        if(player_lost()) {
-            clear_screen(g_backbuffer, COLOR_RED);
-            poll_platform_messages();
-            display_backbuffer(g_backbuffer, g_window);
-            continue;
-        }
-
+    on_init();
+    float64 last_measurement = get_time_ms();
+    while(!g_quit) {
         clear_screen(g_backbuffer, COLOR_BLACK);
         poll_platform_messages();
-        process_input(delta);
-        update_alien_positions();
-        update_entity_positions(delta);
-        generate_alien_projectile(delta, &alien_projectile_timer);
-        check_collisions();
-        draw_sprites(g_backbuffer, &g_screen_info);
+
+        on_update(delta);
         display_backbuffer(g_backbuffer, g_window);
 
+        // Measurements
         float64 current_measurement = get_time_ms();
         float64 elapsed_time_ms = current_measurement - last_measurement;
         delta = elapsed_time_ms / 1000;
-        // convert to ms
         last_measurement = current_measurement;
-        // printf("%f ms, %f fps\n", elapsed_time_ms, 1000.0 /
-        // (elapsed_time_ms));
         float64 fps = 1000.0 / elapsed_time_ms;
         if(avg_fps == 0) {
             avg_fps = fps;
@@ -590,7 +616,21 @@ void game_main(void)
             avg_fps += fps;
             avg_fps /= 2;
         }
+
     }
     printf("Avg fps: %f\n", avg_fps);
-    game_destroy();
+    on_cleanup();
+}
+//-------------------------------------------------------------------------------
+
+// TODO: Add a "remove_dead_aliens" functions
+// which I would call at the beginning of the loop
+// and remove all other explicit dead alien checks from code
+void game_main(void)
+{
+    // TODO: This needs to be called explicitly.
+    // check in engine loop if game has been initialized?
+    //TODO: implement game_init for game specific logic
+    engine_init(128, 130, 8);
+    engine_start();
 }

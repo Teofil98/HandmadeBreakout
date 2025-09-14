@@ -28,9 +28,10 @@ gcc %flags% -std=c99 -g ^
                     ../src/engine_core/win32_engine_core.c ^
                     ../src/game.c ^
                     ../src/ECS/entities.c ^
+                    ../src/ECS/ecs_engine.c ^
                     -lgdi32 -lole32 -lxaudio2_9 ^
                     %link_flags% ^
-                    -o ../win32_hspaceinvaders.exe 
+                    -o ../win32_hspaceinvaders.exe
 
 popd
 exit /b 0

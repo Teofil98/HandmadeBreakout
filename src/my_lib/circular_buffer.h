@@ -1,4 +1,6 @@
-#pragma once
+// clang-format Language: C
+#ifndef CIRCULAR_BUFFER_H
+#define CIRCULAR_BUFFER_H
 
 #include <stdbool.h>
 #include <stdlib.h>
@@ -13,7 +15,8 @@ typedef struct circular_buffer {
     uint64 size;
 } circular_buffer;
 
-static inline uint64 circular_buffer_inc_pointer(circular_buffer* c_buf, uint64 ptr)
+static inline uint64 circular_buffer_inc_pointer(circular_buffer* c_buf,
+                                                 uint64 ptr)
 {
     ptr++;
     if(ptr == c_buf->size) {
@@ -65,3 +68,4 @@ static inline void free_circular_buffer(circular_buffer* c_buf)
     free((void*)(c_buf->buffer));
 }
 
+#endif // CIRCULAR_BUFFER_H

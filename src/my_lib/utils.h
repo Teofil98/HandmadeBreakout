@@ -1,5 +1,6 @@
 // clang-format Language: C
-#pragma once
+#ifndef UTILS_H
+#define UTILS_H
 
 #define MAX(X, Y)                                                              \
     ({                                                                         \
@@ -20,3 +21,5 @@
         __typeof__(X) _x = (X);                                                \
         (_x < 0) ? -1 : 1;                                                     \
     })
+
+#endif // UTILS_H

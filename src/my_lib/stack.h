@@ -1,5 +1,6 @@
 // clang-format Language: C
-#pragma once
+#ifndef STACK_H
+#define STACK_H
 
 // TODO: Implement with macros
 
@@ -7,8 +8,7 @@
 #include "logging.h"
 #include <stdio.h>
 
-typedef struct stack
-{
+typedef struct stack {
     void** data;
     uint64 top;
     uint64 size;
@@ -43,3 +43,5 @@ static inline void* stack_pop(stack* s)
     s->top--;
     return val;
 }
+
+#endif // STACK_H

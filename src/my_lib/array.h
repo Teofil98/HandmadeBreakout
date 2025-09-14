@@ -1,5 +1,6 @@
 // clang-format Language: C
-#pragma once
+#ifndef ARRAY_H
+#define ARRAY_H
 
 #include "defines.h"
 #include "logging.h"
@@ -37,7 +38,8 @@ static inline void array_set(array* a, uint64 idx, void* val)
 
 static inline void array_resize(array* a, uint64 new_size)
 {
-    ASSERT(new_size <= a->capacity, "Trying to resize outside of array bounds\n");
+    ASSERT(new_size <= a->capacity,
+           "Trying to resize outside of array bounds\n");
     a->size = new_size;
 }
 
@@ -59,3 +61,5 @@ static inline void free_array(array* a)
     }
     free((void*)a->elements);
 }
+
+#endif // ARRAY_H

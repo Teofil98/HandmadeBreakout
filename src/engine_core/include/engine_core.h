@@ -25,7 +25,7 @@ void write_sin_wave(platform_sound_buffer* buffer, const uint32 frequency,
                     const int32 tone_volume);
 
 static inline uint32 get_frames_from_time_sec(const float32 time,
-                                       const uint32 samples_per_second)
+                                              const uint32 samples_per_second)
 {
     return (uint32)(time * samples_per_second);
 }

@@ -1,11 +1,13 @@
-#pragma once
+// clang-format Language: C
+#ifndef LOGGING_H
+#define LOGGING_H
 
 #include "config.h"
 #include "defines.h"
 #include <stdarg.h> // TODO: Delete once testing done
+#include <stdbool.h>
 #include <stdio.h>  // TODO: Delete later
 #include <stdlib.h> // TODO: Delete later
-#include <stdbool.h>
 
 static void _vlog_print(const char* error_type, const char* filename,
                         const int32 line, const char* frmat, va_list args)
@@ -15,7 +17,7 @@ static void _vlog_print(const char* error_type, const char* filename,
 }
 
 static inline void _log_print(const char* error_type, const char* filename,
-                       const int32 line, const char* frmat, ...)
+                              const int32 line, const char* frmat, ...)
 {
     va_list args;
     va_start(args, frmat);
@@ -24,7 +26,7 @@ static inline void _log_print(const char* error_type, const char* filename,
 }
 
 static inline void _log_error(const char* filename, const int32 line,
-                       const char* format, ...)
+                              const char* format, ...)
 {
     va_list args;
     va_start(args, format);
@@ -33,8 +35,8 @@ static inline void _log_error(const char* filename, const int32 line,
     exit(1);
 }
 
-static inline void _assert(const char* filename, const int line, const bool condition,
-                    const char* format, ...)
+static inline void _assert(const char* filename, const int line,
+                           const bool condition, const char* format, ...)
 {
     if(!condition) {
         va_list args;
@@ -64,7 +66,10 @@ static inline void _assert(const char* filename, const int line, const bool cond
 #endif
 
 #if ENABLE_ASSERTS == 1
-#define ASSERT(condition, ...) _assert(__FILE__, __LINE__, condition, __VA_ARGS__)
+#define ASSERT(condition, ...)                                                 \
+    _assert(__FILE__, __LINE__, condition, __VA_ARGS__)
 #else
 #define ASSERT(condition, ...)
 #endif
+
+#endif // LOGGING_H

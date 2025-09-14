@@ -1,11 +1,12 @@
 // clang-format Language: C
+#ifndef RAND_H
+#define RAND_H
+
 #include "defines.h"
 
 typedef struct random_number_generator {
     uint32 state;
 } random_number_generator;
-
-// TODO: Move definitions in separate file?
 
 // The state must be initialized to non-zero
 static inline void rand32_xorshift(random_number_generator* rng)
@@ -37,3 +38,5 @@ static inline void rand32_init(random_number_generator* rng, uint32 seed)
 {
     rng->state = seed;
 }
+
+#endif // RAND_H

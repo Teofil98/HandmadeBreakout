@@ -73,19 +73,18 @@ void draw_sprites(screen_information* screen_info)
 }
 
 void engine_init(const uint32 width_in_pixels, const uint32 height_in_pixels,
-               const uint32 pixel_size, screen_information* screen_info)
+                 const uint32 pixel_size, screen_information* screen_info)
 {
     LOG_TRACE("Engine init\n");
 
     const uint32_t bytes_per_pixel = 4;
 
-
-    init_screen_info(screen_info, width_in_pixels, height_in_pixels, pixel_size);
+    init_screen_info(screen_info, width_in_pixels, height_in_pixels,
+                     pixel_size);
     g_window = open_window(WINDOW_TITLE, screen_info->screen_width,
                            screen_info->screen_height);
-    g_backbuffer = create_backbuffer(screen_info->screen_width,
-                                     screen_info->screen_height,
-                                     bytes_per_pixel);
+    g_backbuffer = create_backbuffer(
+        screen_info->screen_width, screen_info->screen_height, bytes_per_pixel);
     const uint8 channels = 2;
     const uint32 nb_samples_per_sec = 44100;
     const uint8 bits_per_sample = 16;

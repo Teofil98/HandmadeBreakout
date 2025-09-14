@@ -4,12 +4,12 @@
 #include "../my_lib/logging.h"
 #include "include/platform_layer.h"
 #include "../my_lib/circular_buffer.h"
+#include "include/engine_core.h"
 #include <X11/XKBlib.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <pulse/simple.h>
 #include <pulse/error.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
@@ -341,7 +341,7 @@ void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
     LOG_TRACE("Sound subsystem successfully initialized\n");
 }
 
-platform_sound_buffer *create_sound_buffer(uint32 size_frames) {
+platform_sound_buffer* create_sound_buffer_frames(uint32 size_frames) {
     LOG_TRACE("Creating sound buffer.\n");
     platform_sound_buffer *sound_buffer =
         (platform_sound_buffer *)malloc(sizeof(platform_sound_buffer));
@@ -360,6 +360,12 @@ platform_sound_buffer *create_sound_buffer(uint32 size_frames) {
 
     LOG_TRACE("Created sound buffer\n");
     return sound_buffer;
+}
+
+
+platform_sound_buffer* create_sound_buffer(const float32 duration_s)
+{
+    return create_sound_buffer_frames(get_frames_from_time_sec(duration_s, g_linux_context.audio_nb_samples_per_sec));
 }
 
 void destroy_sound_buffer(platform_sound_buffer* sound_buffer)

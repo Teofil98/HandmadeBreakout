@@ -8,6 +8,7 @@
 #include "my_lib/array.h"
 #include "my_lib/rand.h"
 #include "my_lib/utils.h"
+#include "ECS/include/ecs_engine.h"
 
 // GENERAL TODO: Check all return values of all functions and log errors where
 // needed. I Probably missed a few places so far in ALL SOURCE FILES SO FAR :)
@@ -64,9 +65,8 @@ static bool g_next_alien_collision_side_left = false;
 static entity_id g_spaceship_projectile;
 static const uint32 g_alien_width = 10;
 static const uint32 g_alien_height = 8;
+static float64 g_alien_projectile_timer;
 static bool g_player_dead = false;
-static platform_window* g_window;
-static platform_backbuffer* g_backbuffer;
 static platform_sound_buffer* g_sound_buffer_shoot;
 static platform_sound_buffer* g_sound_buffer_kill;
 static random_number_generator rng;
@@ -283,53 +283,17 @@ static void check_collisions(void)
     collide_aliens_with_spaceship();
 }
 
-void engine_init(const uint32 width_in_pixels, const uint32 height_in_pixels,
-               const uint32 pixel_size)
-{
-    LOG_TRACE("Game init\n");
-
-    const uint32_t bytes_per_pixel = 4;
-
-    init_array(&g_aliens, ALIENS_ROWS * ALIENS_COLS);
-    init_array(&g_aliens_projectiles, MAX_ALIEN_PROJECTILES);
-
-    init_screen_info(&g_screen_info, width_in_pixels, height_in_pixels, pixel_size);
-    g_window = open_window(WINDOW_TITLE, g_screen_info.screen_width,
-                           g_screen_info.screen_height);
-    g_backbuffer = create_backbuffer(g_screen_info.screen_width,
-                                     g_screen_info.screen_height,
-                                     bytes_per_pixel);
-    const uint8 channels = 2;
-    const uint32 nb_samples_per_sec = 44100;
-    const uint8 bits_per_sample = 16;
-    init_sound(channels, nb_samples_per_sec, bits_per_sample, WINDOW_TITLE);
-    g_sound_buffer_shoot = create_sound_buffer(
-        get_frames_from_time_sec(0.2f, nb_samples_per_sec));
-    g_sound_buffer_kill = create_sound_buffer(
-        get_frames_from_time_sec(0.2f, nb_samples_per_sec));
-    init_input();
-    init_entity_system();
-    rand32_init(&rng, SEED);
-
-    LOG_TRACE("Game init done\n");
-}
-
-void game_destroy(void)
+static void game_destroy(void)
 {
     LOG_TRACE("Destroying game\n");
     free_array(&g_aliens);
     free_array(&g_aliens_projectiles);
-	teardown_entity_system();
-    destroy_window(g_window);
-    destroy_backbuffer(g_backbuffer);
     destroy_sound_buffer(g_sound_buffer_shoot);
     destroy_sound_buffer(g_sound_buffer_kill);
-    teardown_sound();
-    teardown_input();
     LOG_TRACE("Destroyed game\n");
 }
 
-void process_input(const float64 delta)
+static void process_input(const float64 delta)
 {
     position_component old_position = positions[g_spaceship_id.index];
     if(keys[KEY_A].held) {
@@ -356,17 +320,6 @@ void process_input(const float64 delta)
     }
 }
 
-// OPTIMIZE: Memcpy
-static void clear_screen(platform_backbuffer* backbuffer, uint32 color)
-{
-    uint32* pixels = (uint32_t*)backbuffer->bitmap;
-    uint32 num_cols = backbuffer->width;
-    for(uint32 i = 0; i < backbuffer->height; i++) {
-        for(uint32 j = 0; j < backbuffer->width; j++) {
-            pixels[i * num_cols + j] = color;
-        }
-    }
-}
 
 static bool player_won(void)
 {
@@ -527,27 +480,22 @@ static void update_alien_positions(void)
     }
 }
 
-//-------------------------------------------------------------------------------
-float64 g_alien_projectile_timer;
 // Called when the game starts
 void on_init()
 {
+    LOG_TRACE("Game init\n");
+    init_array(&g_aliens, ALIENS_ROWS * ALIENS_COLS);
+    init_array(&g_aliens_projectiles, MAX_ALIEN_PROJECTILES);
+    g_sound_buffer_shoot = create_sound_buffer(0.2f);
+    g_sound_buffer_kill = create_sound_buffer(0.2f);
     write_sin_wave(g_sound_buffer_shoot, 300, 1600);
     write_sin_wave(g_sound_buffer_kill, 500, 1600);
     g_spaceship_id = create_spaceship();
     create_alien_matrix();
     g_alien_projectile_timer = g_alien_projectile_frequency;
+    rand32_init(&rng, SEED);
+    LOG_TRACE("Game init done\n");
 }
-
-
-
-bool g_quit = false;
-
-void engine_quit()
-{
-    g_quit = true;
-}
-
 
 // Called every frame
 void on_update(const float64 delta)
@@ -565,12 +513,12 @@ void on_update(const float64 delta)
 
     // check if the game has ended
     if(player_won()) {
-        clear_screen(g_backbuffer, COLOR_GREEN);
+        clear_screen(COLOR_GREEN);
         return;
     }
 
     if(player_lost()) {
-        clear_screen(g_backbuffer, COLOR_RED);
+        clear_screen(COLOR_RED);
         return;
     }
 
@@ -579,7 +527,7 @@ void on_update(const float64 delta)
     update_entity_positions(delta);
     generate_alien_projectile(delta, &g_alien_projectile_timer);
     check_collisions();
-    draw_sprites(g_backbuffer, &g_screen_info);
+    draw_sprites(&g_screen_info);
 }
 
 // Called once when the engine_quit() function is called
@@ -588,41 +536,6 @@ void on_cleanup()
     game_destroy();
 }
 
-void engine_start()
-{
-    // TODO: What should be the first value of delta?
-    float64 delta = 0;
-    float64 avg_fps = 0;
-    g_quit = false;
-
-    on_init();
-    float64 last_measurement = get_time_ms();
-    while(!g_quit) {
-        clear_screen(g_backbuffer, COLOR_BLACK);
-        poll_platform_messages();
-
-        on_update(delta);
-        display_backbuffer(g_backbuffer, g_window);
-
-        // Measurements
-        float64 current_measurement = get_time_ms();
-        float64 elapsed_time_ms = current_measurement - last_measurement;
-        delta = elapsed_time_ms / 1000;
-        last_measurement = current_measurement;
-        float64 fps = 1000.0 / elapsed_time_ms;
-        if(avg_fps == 0) {
-            avg_fps = fps;
-        } else {
-            avg_fps += fps;
-            avg_fps /= 2;
-        }
-
-    }
-    printf("Avg fps: %f\n", avg_fps);
-    on_cleanup();
-}
-//-------------------------------------------------------------------------------
-
 // TODO: Add a "remove_dead_aliens" functions
 // which I would call at the beginning of the loop
 // and remove all other explicit dead alien checks from code
@@ -630,7 +543,6 @@ void game_main(void)
 {
     // TODO: This needs to be called explicitly.
     // check in engine loop if game has been initialized?
-    //TODO: implement game_init for game specific logic
-    engine_init(128, 130, 8);
+    engine_init(128, 130, 8, &g_screen_info);
     engine_start();
 }

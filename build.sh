@@ -27,6 +27,7 @@ gcc $flags -std=c99 -g ../src/engine_core/linux_engine_core.c \
 			    ../src/engine_core/common_engine_core.c \
                             ../src/game.c \
                             ../src/ECS/entities.c \
+                            ../src/ECS/ecs_engine.c \
                             -lX11 -lpulse-simple -lpulse -lpthread -lm\
                             $link_flags \
                             -o ../linux_game.elf

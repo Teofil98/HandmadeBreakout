@@ -61,36 +61,6 @@ bool entity_valid(entity_id id)
     return id.version == entity_id_array[id.index].version;
 }
 
-void draw_sprite(const entity_id id, platform_backbuffer* backbuffer,
-                 screen_information* screen_info)
-{
-    uint32 height = sprites[id.index].height;
-    uint32 width = sprites[id.index].width;
-    const uint8* sprite = sprites[id.index].sprite;
-    uint32 color = sprites[id.index].color;
-    uint32 entity_row = (uint32)positions[id.index].y;
-    uint32 entity_col = (uint32)positions[id.index].x;
-
-    for(uint32 i = 0; i < height; i++) {
-        for(uint32 j = 0; j < width; j++) {
-            if(sprite[width * i + j] == '*') {
-                draw_pixel(backbuffer, entity_row + i, entity_col + j, color,
-                           screen_info);
-            }
-        }
-    }
-}
-
-void draw_sprites(platform_backbuffer* backbuffer,
-                  screen_information* screen_info)
-{
-    for(uint64 i = 0; i < MAX_ENTITIES; i++) {
-        entity_id id = entity_id_array[i];
-        if(entity_in_use[id.index]) {
-            draw_sprite(id, backbuffer, screen_info);
-        }
-    }
-}
 
 bool out_of_bounds(entity_id id, float32 left_lim, float32 right_lim,
                           float32 top_lim, float32 bottom_lim)

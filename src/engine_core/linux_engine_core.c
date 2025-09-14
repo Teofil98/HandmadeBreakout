@@ -274,6 +274,7 @@ static void* sound_thread_function(void* arg)
     while(true) {
         sem_wait(&g_linux_context.sound_semaphore);
         if(g_linux_context.kill_sound_thread) {
+            LOG_TRACE("Sound thread got kill signal\n");
             break;
         }
         // play the next sample in the circular buffer;
@@ -293,7 +294,8 @@ static void* sound_thread_function(void* arg)
           LOG_ERROR("Error on pa_simple_write(): %s\n", pa_strerror(error));
         }
     }
-    return NULL;
+    LOG_TRACE("Sound thread exited\n");
+    pthread_exit(NULL);
 }
 
 void init_sound(const uint16 nb_channels, const uint32 nb_samples_per_sec,
@@ -388,9 +390,13 @@ void teardown_sound()
 {
     LOG_TRACE("Tearing down sound subsystem\n");
 
+    LOG_TRACE("Sending kill signal\n");
     g_linux_context.kill_sound_thread = true;
+    LOG_TRACE("Incrementing semaphore\n");
     sem_post(&g_linux_context.sound_semaphore);
+    LOG_TRACE("Joining sound thread\n");
     pthread_join(g_linux_context.sound_thread, NULL);
+    LOG_TRACE("Sound thread joined\n");
 
     pa_simple_drain(g_linux_context.sound_stream, NULL);
     pa_simple_free(g_linux_context.sound_stream);

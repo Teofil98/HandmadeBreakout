@@ -10,12 +10,23 @@
 
 #include <stdint.h>
 
-// TODO: Convert to uint8
+typedef uint64_t uint64;
+typedef uint32_t uint32;
+typedef uint16_t uint16;
+typedef uint8_t uint8;
+typedef int64_t int64;
+typedef int32_t int32;
+typedef int16_t int16;
+typedef int8_t int8;
+typedef float float32;
+typedef double float64;
+typedef int32 status;
+
 #define UNUSED(x) (void)x
-#define RGBA_ALPHA(x) ((uint8_t)x << 24)
-#define RGBA_RED(x) ((uint8_t)x << 16)
-#define RGBA_GREEN(x) ((uint8_t)x << 8)
-#define RGBA_BLUE(x) ((uint8_t)x << 0)
+#define RGBA_ALPHA(x) ((uint8)(x) << 24)
+#define RGBA_RED(x) ((uint8)(x) << 16)
+#define RGBA_GREEN(x) ((uint8)(x) << 8)
+#define RGBA_BLUE(x) ((uint8)(x) << 0)
 #define RGBA(r, g, b, a)                                                       \
     (RGBA_RED(r) | RGBA_GREEN(g) | RGBA_BLUE(b) | RGBA_ALPHA(a))
 
@@ -34,17 +45,5 @@
 #define STATUS_FAILURE -1
 
 #define UINT32_MAXIMUM 0xFFFFFFFF
-
-typedef uint64_t uint64;
-typedef uint32_t uint32;
-typedef uint16_t uint16;
-typedef uint8_t uint8;
-typedef int64_t int64;
-typedef int32_t int32;
-typedef int16_t int16;
-typedef int8_t int8;
-typedef float float32;
-typedef double float64;
-typedef int32 status;
 
 #endif // DEFINES_H

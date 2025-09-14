@@ -11,7 +11,6 @@ entity_id entity_id_array[MAX_ENTITIES];
 uint64 components_used[MAX_ENTITIES];
 // OPTIMIZE: Can optimize this with bit operations instead of bools
 bool entity_in_use[MAX_ENTITIES];
-//static stack<entity_id, MAX_ENTITIES> available_entity_ids;
 static stack available_entity_ids;
 
 void init_entity_system(void)
@@ -25,7 +24,7 @@ void init_entity_system(void)
         entity_id* new_id = (entity_id*)malloc(sizeof(entity_id));
         *new_id = id;
         stack_push(&available_entity_ids, (void*)new_id);
-        // TODO: Technically don't need this since it's gloabal and will be
+        // NOTE: Technically don't need this since it's gloabal and will be
         // automatically initialized to 0. But I like to be explicit :)
         entity_in_use[id.index] = false;
     }

@@ -4,10 +4,10 @@
 
 #include "config.h"
 #include "defines.h"
-#include <stdarg.h> // TODO: Delete once testing done
+#include <stdarg.h>
 #include <stdbool.h>
-#include <stdio.h>  // TODO: Delete later
-#include <stdlib.h> // TODO: Delete later
+#include <stdio.h>
+#include <stdlib.h>
 
 static void _vlog_print(const char* error_type, const char* filename,
                         const int32 line, const char* frmat, va_list args)

@@ -22,7 +22,8 @@ Breakout game made from scratch (as much as possible)
 ## TODO
 
 - [X] Windows port
-- [ ] Restore Logging
+- [X] Restore Logging
+- [ ] group globals in struct
 - [ ] Valgrind external lib ignore
 - [ ] Fix memory leaks
 - [ ] Implement generic DSes with macros instead of void pointers
